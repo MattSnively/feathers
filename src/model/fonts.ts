@@ -26,6 +26,8 @@ export const POWER_BI_FONTS = [
   "Segoe UI",
   "Segoe UI Light",
   "Segoe UI Semibold",
+  // Power BI's dropdown labels the bold weight "Segoe (Bold)", not "Segoe UI Bold".
+  "Segoe (Bold)",
   "DIN",
   "Arial",
   "Arial Black",
