@@ -347,6 +347,28 @@ const dark = await page.evaluate(() => ({ body: getComputedStyle(document.body).
 check("dark mode: dark surfaces, light text", dark.body === "rgb(20, 23, 29)" && dark.panel === "rgb(20, 23, 29)" && dark.text === "rgb(238, 240, 244)", JSON.stringify(dark));
 await page.screenshot({ path: path.join(SHOTS, "e2e-dark.png") });
 
+// ---- Sample pages (Overview / Trends / Breakdown) ----------------------------------------------
+await page.emulateMedia({ colorScheme: "light" });
+const pickTool = (name) => page.locator(".tool-tabs button", { hasText: name }).click();
+const pickPage = (p) => page.locator(`.page-tab[data-page="${p}"]`).click();
+await pickTool("Power BI");
+check("pages: three tabs, Overview selected by default after a reload", (await page.locator(".page-tab").count()) === 3 && (await page.locator('.page-tab[aria-pressed="true"]').innerText()) === "Overview");
+await pickPage("trends");
+check("Power BI Trends: stacked area, stacked columns and a line chart", (await page.locator('.pv-canvas svg[aria-label="Sample stacked area chart"] polygon').count()) === 3 && (await page.locator('svg[aria-label="Sample stacked column chart"] rect').count()) === 12 && (await page.locator('svg[aria-label="Sample year-over-year line chart"] polyline').count()) >= 2);
+await pickPage("breakdown");
+check("Power BI Breakdown: donut (5), heatmap (16 cells), variance bars (6), status tiles (3)", (await page.locator('svg[aria-label="Sample donut chart"] path').count()) === 5 && (await page.locator(".pv-heat td").count()) === 16 && (await page.locator('svg[aria-label^="Sample variance bars"] rect:not([stroke])').count()) >= 6 && (await page.locator(".pv-tile").count()) === 3);
+await page.locator(".pv-heat td").first().click();
+check("clicking a heatmap cell jumps to a gradient color", (await focusKey()) === "diverging-2" || (await focusKey()) === "diverging-1" || (await focusKey()) === "diverging-0", String(await focusKey()));
+await pickTool("Tableau");
+check("switching tool keeps the page; Tableau has no status tiles and shows a sequential scale", (await page.locator('.page-tab[aria-pressed="true"]').innerText()) === "Breakdown" && (await page.locator(".pv-tile").count()) === 0 && (await page.locator(".pv-scale").count()) === 2);
+await page.locator(".pv-heat td").first().click();
+check("Tableau heatmap cell jumps to a sequential color", ["sequential-0", "sequential-1"].includes(await focusKey()), String(await focusKey()));
+check("Tableau variance center rule is the zero line", (await page.locator('svg[aria-label^="Sample variance bars"] line:not([stroke="transparent"])').count()) === 1);
+await pickPage("overview");
+check("back on Overview the full suite returns", (await page.locator(".pv-tab .pv-kpis > .pv-card").count()) === 4);
+await page.reload();
+check("page choice is a view preference and is not saved", (await page.locator('.page-tab[aria-pressed="true"]').innerText()) === "Overview");
+
 check("no console errors", consoleErrors.length === 0, consoleErrors.join(" | "));
 
 await browser.close();

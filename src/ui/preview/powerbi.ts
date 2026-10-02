@@ -1,10 +1,8 @@
 import type { Theme } from "../../model/theme";
-import { calloutPx, fontStyle, px, type FontStyle } from "../../preview/style";
+import { calloutPx, css, fontStyle, px } from "../../preview/style";
 import { h, s } from "../dom";
 import { columnChart, lineChart, scatterChart, type Edit } from "./chart";
-
-export const css = (f: FontStyle, sizePx: number, color: string) =>
-  `font-family:${f.family};font-weight:${f.weight};font-size:${sizePx}px;color:${color}`;
+import { extraPage, type PreviewPage } from "./pages";
 
 const KPIS = [
   { label: "Revenue", value: "$4.2M", delta: "▲ 4.2%", up: true },
@@ -39,7 +37,7 @@ const TABLE = [
   ["West", "$0.86M", "27%"],
 ];
 
-export function powerBiPreview(theme: Theme, edit: Edit): HTMLElement {
+export function powerBiPreview(theme: Theme, edit: Edit, pageName: PreviewPage = "overview"): HTMLElement {
   const { palette, status, text, background, gridline, sizes } = theme;
   const body = fontStyle(theme.fonts.powerBi.body);
   const title = fontStyle(theme.fonts.powerBi.title);
@@ -107,17 +105,21 @@ export function powerBiPreview(theme: Theme, edit: Edit): HTMLElement {
     h("tbody", {}, ...TABLE.map((row) => h("tr", {}, ...row.map((c) =>
       edit(cell(c, `${css(body, bodyPx, text.primary)};${grid}`, "td"), "font-body", "body font"))))));
 
+  const overview = () => [
+    edit(h("h4", { class: "pv-title", style: css(title, titlePx + 4, text.primary) }, "Regional performance"), "font-title", "title font"),
+    h("div", { class: "pv-kpis" }, ...KPIS.map(kpi)),
+    h("div", { class: "pv-row" },
+      card(visualTitle("Sales by quarter"), columns, legend()),
+      card(visualTitle("Monthly trend"), lines, legend()),
+      card(visualTitle("Margin vs. volume"), scatter, legend())),
+    h("div", { class: "pv-row split" },
+      card(visualTitle("Share by category"), share, shareLegend),
+      card(visualTitle("Top regions"), table)),
+  ];
+
   const page = edit(
     h("div", { class: "pv-page", style: `background:${background.page}` },
-      edit(h("h4", { class: "pv-title", style: css(title, titlePx + 4, text.primary) }, "Regional performance"), "font-title", "title font"),
-      h("div", { class: "pv-kpis" }, ...KPIS.map(kpi)),
-      h("div", { class: "pv-row" },
-        card(visualTitle("Sales by quarter"), columns, legend()),
-        card(visualTitle("Monthly trend"), lines, legend()),
-        card(visualTitle("Margin vs. volume"), scatter, legend())),
-      h("div", { class: "pv-row split" },
-        card(visualTitle("Share by category"), share, shareLegend),
-        card(visualTitle("Top regions"), table))),
+      ...(pageName === "overview" ? overview() : extraPage(pageName, "powerbi", theme, edit))),
     "bg-page", "page background");
 
   return edit(h("div", { class: "pv-canvas", style: `background:${background.canvas}` }, page), "bg-canvas", "canvas background");

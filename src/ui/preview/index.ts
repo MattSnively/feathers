@@ -4,6 +4,7 @@ import { h } from "../dom";
 import { icon } from "../icons";
 import { isAvailable, resolveKey } from "../visibility";
 import type { Edit } from "./chart";
+import { PAGES, type PreviewPage } from "./pages";
 import { powerBiPreview } from "./powerbi";
 import { tableauPreview } from "./tableau";
 
@@ -32,6 +33,8 @@ export function buildPreview(store: Store, reveal: (key: string) => void): HTMLE
   const root = h("main", { class: "stage", id: "preview", "aria-label": "Preview" });
 
   let zoomChoice: "fit" | number = "fit";
+  // Which sample page is showing; a view preference, not part of the theme, so it is never saved.
+  let pageName: PreviewPage = "overview";
 
   const edit: Edit = (el, requested, label) => {
     // Read at call time (the report redraws on every change), so this always reflects the current mode.
@@ -93,7 +96,20 @@ export function buildPreview(store: Store, reveal: (key: string) => void): HTMLE
     },
   }, icon("pencil", 16), "Edit hints");
 
-  const toolbar = h("div", { class: "stage-toolbar" }, zoomSelect, hintsBtn);
+  const pageTabs = h("div", { class: "page-tabs", role: "group", "aria-label": "Sample page" },
+    ...PAGES.map((p) => h("button", {
+      type: "button",
+      class: "page-tab",
+      "data-page": p.value,
+      "aria-pressed": String(p.value === pageName),
+      onclick: () => {
+        pageName = p.value;
+        pageTabs.querySelectorAll<HTMLElement>(".page-tab").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.page === pageName)));
+        render();
+      },
+    }, p.label)));
+
+  const toolbar = h("div", { class: "stage-toolbar" }, pageTabs, zoomSelect, hintsBtn);
 
   /**
    * Scales the report to the stage on wide screens; on narrow ones it reflows at full width instead.
@@ -121,7 +137,7 @@ export function buildPreview(store: Store, reveal: (key: string) => void): HTMLE
 
   function render() {
     const { theme, tool } = store.get();
-    frame.replaceChildren(tool === "powerbi" ? powerBiPreview(theme, edit) : tableauPreview(theme, edit));
+    frame.replaceChildren(tool === "powerbi" ? powerBiPreview(theme, edit, pageName) : tableauPreview(theme, edit, pageName));
     caption.textContent = CAPTION[tool];
     applyZoom();
   }

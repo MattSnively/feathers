@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { layoutBars, scaleX, scaleY, type Plot } from "../src/preview/geometry";
-import { calloutPx, fontStyle, lineAttrs, px } from "../src/preview/style";
+import { donutAngles, layoutBars, layoutStacked, ringPath, scaleX, scaleY, stackValues, type Plot } from "../src/preview/geometry";
+import { calloutPx, fontStyle, lineAttrs, px, rampColor } from "../src/preview/style";
 
 describe("fontStyle", () => {
   it("keeps plain families at regular weight with a generic fallback", () => {
@@ -103,5 +103,46 @@ describe("chart geometry", () => {
       expect(b.x).toBeGreaterThanOrEqual(plot.left);
       expect(b.x + b.width).toBeLessThanOrEqual(plot.left + plot.width);
     }
+  });
+});
+
+describe("stacked and ring geometry", () => {
+  const plot: Plot = { left: 0, top: 0, width: 100, height: 100 };
+
+  it("stacks series cumulatively per category", () => {
+    const cells = stackValues([[1, 2], [3, 4]]);
+    expect(cells.map((c) => [c.from, c.to])).toEqual([[0, 1], [0, 2], [1, 4], [2, 6]]);
+  });
+
+  it("lays stacked segments edge to edge, top of the stack at the cumulative value", () => {
+    const [first, second] = layoutStacked(plot, [0, 100], [[20], [30]]);
+    expect(first!.y + first!.height).toBeCloseTo(100);
+    expect(second!.y + second!.height).toBeCloseTo(first!.y);
+    expect(second!.y).toBeCloseTo(50);
+  });
+
+  it("splits a donut into angles that cover the full circle", () => {
+    const angles = donutAngles([1, 1, 2]);
+    expect(angles[0]!.start).toBe(0);
+    expect(angles[2]!.end).toBeCloseTo(Math.PI * 2);
+    expect(angles[1]!.end - angles[1]!.start).toBeCloseTo(Math.PI / 2);
+  });
+
+  it("flags large arcs so a share over half a turn draws the long way round", () => {
+    expect(ringPath(50, 50, 40, 20, 0, Math.PI * 1.5)).toContain("A40 40 0 1 1");
+    expect(ringPath(50, 50, 40, 20, 0, Math.PI / 2)).toContain("A40 40 0 0 1");
+  });
+});
+
+describe("rampColor", () => {
+  it("returns the stops at the ends and the midpoint of a three-stop ramp", () => {
+    const ramp = ["#000000", "#FF0000", "#FFFFFF"];
+    expect(rampColor(ramp, 0)).toBe("#000000");
+    expect(rampColor(ramp, 0.5)).toBe("#FF0000");
+    expect(rampColor(ramp, 1)).toBe("#FFFFFF");
+  });
+  it("clamps out-of-range positions", () => {
+    expect(rampColor(["#000000", "#FFFFFF"], 2)).toBe("#FFFFFF");
+    expect(rampColor(["#000000", "#FFFFFF"], -1)).toBe("#000000");
   });
 });

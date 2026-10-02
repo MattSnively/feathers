@@ -1,4 +1,5 @@
 import type { Line } from "../model/theme";
+import { mix } from "../a11y/color";
 
 export interface FontStyle {
   /** CSS font-family stack. */
@@ -57,3 +58,15 @@ export function lineAttrs(line: Line): LineAttrs {
   if (line.style === "dotted") return { ...base, "stroke-dasharray": `0.1 ${w * 2.5}`, "stroke-linecap": "round" };
   return { ...base, "stroke-linecap": "butt" };
 }
+
+/** Color at position `t` (0-1) along an evenly spaced ramp of two or more stops. */
+export function rampColor(stops: string[], t: number): string {
+  const clamped = Math.min(Math.max(t, 0), 1);
+  const span = (stops.length - 1) * clamped;
+  const i = Math.min(Math.floor(span), stops.length - 2);
+  return mix(stops[i]!, stops[i + 1]!, span - i);
+}
+
+/** Inline CSS for text in a theme font. */
+export const css = (f: FontStyle, sizePx: number, color: string) =>
+  `font-family:${f.family};font-weight:${f.weight};font-size:${sizePx}px;color:${color}`;

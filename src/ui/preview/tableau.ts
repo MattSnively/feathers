@@ -1,8 +1,8 @@
 import type { Theme } from "../../model/theme";
-import { fontStyle, px } from "../../preview/style";
+import { css, fontStyle, px } from "../../preview/style";
 import { h } from "../dom";
 import { columnChart, lineChart, scatterChart, type Edit } from "./chart";
-import { css } from "./powerbi";
+import { extraPage, type PreviewPage } from "./pages";
 
 const KPIS = [
   { label: "Sales", value: "$2.3M", delta: "▲ 12.4%" },
@@ -31,7 +31,7 @@ const TABLE = [
   ["Account 1576", "Consumer", "$12,228", "-$1,310"],
 ];
 
-export function tableauPreview(theme: Theme, edit: Edit): HTMLElement {
+export function tableauPreview(theme: Theme, edit: Edit, pageName: PreviewPage = "overview"): HTMLElement {
   const { palette, text, background, gridline, zeroline, sizes } = theme;
   const body = fontStyle(theme.fonts.tableau.body);
   const title = fontStyle(theme.fonts.tableau.title);
@@ -88,7 +88,7 @@ export function tableauPreview(theme: Theme, edit: Edit): HTMLElement {
     h("tbody", {}, ...TABLE.map((row) => h("tr", {}, ...row.map((c) =>
       edit(h("td", { style: `${css(body, bodyPx, text.secondary)};${grid}` }, c), "font-body", "body font"))))));
 
-  return h("div", { class: "pv-tab" },
+  const overview = () => [
     // The dashboard frame isn't part of Tableau's theme, so it stays neutral here.
     edit(h("h4", { class: "pv-title", style: css({ ...title, weight: 700 }, titlePx + 2, text.primary) }, "Superstore profit"), "font-title", "title font"),
     h("div", { class: "pv-kpis" }, ...KPIS.map(kpi)),
@@ -97,5 +97,8 @@ export function tableauPreview(theme: Theme, edit: Edit): HTMLElement {
       view(sheetTitle("Sales trend"), line),
       view(sheetTitle("Sales vs. profit"), scatter, h("div", { class: "pv-spacer" }), tooltip)),
     h("div", { class: "pv-row" },
-      view(sheetTitle("Top accounts"), table)));
+      view(sheetTitle("Top accounts"), table)),
+  ];
+
+  return h("div", { class: "pv-tab" }, ...(pageName === "overview" ? overview() : extraPage(pageName, "tableau", theme, edit)));
 }
