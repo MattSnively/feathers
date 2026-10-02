@@ -1,5 +1,5 @@
 import { analyzeTheme } from "../a11y/analyze";
-import { POWER_BI_FONTS, TABLEAU_FONTS } from "../model/fonts";
+import { ALL_FONTS, applyFont, currentFont, fontLabel, fontNotice, type FontRole } from "../model/fonts";
 import type { LineStyle, Theme } from "../model/theme";
 import type { Store } from "../state/store";
 import { buildA11yPanel } from "./a11yPanel";
@@ -210,21 +210,30 @@ export function buildSidebar(store: Store): { rail: HTMLElement; panel: HTMLElem
 
   // ---- Text -----------------------------------------------------------------------------------
 
+  /** A font picker over one list for both tools, with a line that says which tools the choice works in. */
+  function fontField(role: FontRole, key: string, both: boolean) {
+    const { theme } = store.get();
+    const notice = h("p", { class: "hint font-notice" }, fontNotice(currentFont(theme.fonts, role)).text);
+    const field = selectField("Font", ALL_FONTS, currentFont(theme.fonts, role), (v) => {
+      store.updateTheme((t) => applyFont(t.fonts, v, both ? "both" : role));
+      notice.textContent = fontNotice(v).text;
+    }, { key, label: fontLabel });
+    return [field, notice];
+  }
+
   function textTab(): Node[] {
     const { theme, tool, mode } = store.get();
-    const key = tool === "powerbi" ? "powerBi" : "tableau";
-    const list = tool === "powerbi" ? POWER_BI_FONTS : TABLEAU_FONTS;
     if (mode === "beginner") {
-      return [section(`Font (${tool === "powerbi" ? "Power BI" : "Tableau"})`, "All text",
-        selectField("Font", list, theme.fonts[key].body, (v) => store.updateTheme((t) => { t.fonts[key].body = v; t.fonts[key].title = v; }), { key: "font-body" }),
-        hint("One font is used for all text. Advanced sets titles and sizes separately."))];
+      return [section("Font", "All text",
+        ...fontField("body", "font-body", true),
+        hint("One font is used for all text, in both tools. Advanced sets titles and sizes separately."))];
     }
     return [
       section("Body", "Labels, axes, tables",
-        selectField("Font", list, theme.fonts[key].body, (v) => store.updateTheme((t) => { t.fonts[key].body = v; }), { key: "font-body" }),
+        ...fontField("body", "font-body", false),
         sliderField("Font size", theme.sizes.body, { min: 8, max: 24, unit: "pt", key: "size-body" }, (n) => store.updateTheme((t) => { t.sizes.body = n; }))),
       section("Titles", "Page and visual titles",
-        selectField("Font", list, theme.fonts[key].title, (v) => store.updateTheme((t) => { t.fonts[key].title = v; }), { key: "font-title" }),
+        ...fontField("title", "font-title", false),
         sliderField("Font size", theme.sizes.title, { min: 10, max: 36, unit: "pt", key: "size-title" }, (n) => store.updateTheme((t) => { t.sizes.title = n; }))),
       tool === "powerbi"
         ? section("Card values", "Big KPI numbers",

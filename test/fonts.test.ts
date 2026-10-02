@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ALL_FONTS, applyFont, currentFont, fontNotice, fontSupport, POWER_BI_FONTS, TABLEAU_FONTS } from "../src/model/fonts";
+import { ALL_FONTS, applyFont, currentFont, fontLabel, fontNotice, fontSupport, POWER_BI_FONTS, TABLEAU_FONTS } from "../src/model/fonts";
 import { blank } from "../src/presets/blank";
 
 const fonts = () => structuredClone(blank.fonts);
@@ -60,5 +60,32 @@ describe("currentFont and notices", () => {
     expect(fontNotice("Arial")).toEqual({ kind: "both", text: "Arial works in both Power BI and Tableau." });
     expect(fontNotice("DIN").text).toContain("Tableau theme will use Tableau Book");
     expect(fontNotice("Tableau Bold").text).toContain("Power BI theme will use Segoe UI");
+  });
+});
+
+describe("applyFont by role", () => {
+  it("changes only the body or only the titles", () => {
+    const f = fonts();
+    applyFont(f, "Verdana", "body");
+    expect(f.powerBi).toEqual({ body: "Verdana", title: blank.fonts.powerBi.title });
+    applyFont(f, "Georgia", "title");
+    expect(f.tableau.title).toBe("Georgia");
+    expect(f.tableau.body).toBe("Verdana");
+  });
+
+  it("falls back per tool for one role without touching the other", () => {
+    const f = fonts();
+    applyFont(f, "Verdana");
+    applyFont(f, "DIN", "title");
+    expect(f.powerBi).toEqual({ body: "Verdana", title: "DIN" });
+    expect(f.tableau).toEqual({ body: "Verdana", title: "Tableau Book" });
+    expect(currentFont(f, "title")).toBe("DIN");
+    expect(currentFont(f, "body")).toBe("Verdana");
+  });
+
+  it("labels options with where they work", () => {
+    expect(fontLabel("Arial")).toBe("Arial · both");
+    expect(fontLabel("DIN")).toBe("DIN · Power BI");
+    expect(fontLabel("Tableau Bold")).toBe("Tableau Bold · Tableau");
   });
 });

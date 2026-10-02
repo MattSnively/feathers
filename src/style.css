@@ -516,14 +516,21 @@ dialog.drawer::backdrop { background: rgba(10, 12, 18, 0.55); }
   display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 16px;
   border: 2px solid var(--border); border-radius: 18px; background: var(--surface); text-align: left; color: var(--ink);
 }
-.ob-font:hover { border-color: var(--border-strong); }
-.ob-font[aria-pressed="true"] { border-color: var(--ink); }
+/* Edge color says which tool ships the font: yellow Power BI, blue Tableau, green both. The tag text says the same. */
+.ob-font.powerbi, .ob-font-key .powerbi { --edge: #D19A00; }
+.ob-font.tableau, .ob-font-key .tableau { --edge: #2F6FDE; }
+.ob-font.both, .ob-font-key .both { --edge: #1E9E57; }
+.ob-font { border-color: var(--edge); }
+.ob-font:hover { background: var(--surface-2); }
+.ob-font[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 2px; }
+.ob-font-key { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.ob-font-key span { padding: 4px 12px; border: 2px solid var(--edge); border-radius: 999px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
 .ob-font-aa { font-size: 34px; line-height: 1; }
 .ob-font-name { font-size: 13px; font-weight: 600; color: var(--ink-2); }
 .ob-font-tools { font-family: var(--font); font-size: 11.5px; font-weight: 500; color: var(--ink-3); }
 .ob-font-notice { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 20px; padding: 14px 16px; border-radius: 14px; background: var(--surface-2); color: var(--ink); font-size: 14.5px; line-height: 1.45; }
 .ob-font-notice .icon { flex: none; margin-top: 2px; }
-.ob-font-notice.both { background: var(--accent-soft); }
+.ob-font-notice.both { background: color-mix(in srgb, #1E9E57 14%, transparent); }
 .ob-note { margin: 20px 0 0; font-size: 13.5px; color: var(--ink-2); }
 
 .ob-name {

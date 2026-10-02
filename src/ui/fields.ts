@@ -156,7 +156,7 @@ export function selectField(
   options: readonly string[],
   value: string,
   onChange: (value: string) => void,
-  opts: { key?: string } = {},
+  opts: { key?: string; label?: (value: string) => string } = {},
 ): HTMLElement {
   const id = uid("select");
   // A restored theme may name a font that has since left the curated list; keep it selectable.
@@ -164,7 +164,7 @@ export function selectField(
   const select = h(
     "select",
     { id, class: "select", "data-key": opts.key, onchange: () => onChange(select.value) },
-    ...all.map((o) => h("option", { value: o, selected: o === value }, o)),
+    ...all.map((o) => h("option", { value: o, selected: o === value }, opts.label ? opts.label(o) : o)),
   );
   return h("div", { class: "field" }, h("label", { htmlFor: id }, label), select);
 }

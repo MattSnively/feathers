@@ -71,26 +71,39 @@ export const ALL_FONTS: readonly string[] = (() => {
   return [...shared, ...powerBiOnly, ...tableauOnly];
 })();
 
+type FontSlots = { powerBi: { body: string; title: string }; tableau: { body: string; title: string } };
+export type FontRole = "body" | "title";
+
 /**
  * The font a theme is "using" when the user picks one font for everything. Power BI's font wins unless
  * it is just the untouched default and Tableau has a deliberate choice.
  */
-export function currentFont(fonts: { powerBi: { body: string }; tableau: { body: string } }): string {
-  const untouchedPowerBi = fonts.powerBi.body === DEFAULT_FONTS.powerBi;
-  const tableauChoice = fonts.tableau.body !== DEFAULT_FONTS.tableau;
-  return untouchedPowerBi && tableauChoice && !fontSupport(fonts.powerBi.body).tableau ? fonts.tableau.body : fonts.powerBi.body;
+export function currentFont(fonts: FontSlots, role: FontRole = "body"): string {
+  const powerBi = fonts.powerBi[role];
+  const tableau = fonts.tableau[role];
+  const untouchedPowerBi = powerBi === DEFAULT_FONTS.powerBi;
+  const tableauChoice = tableau !== DEFAULT_FONTS.tableau;
+  return untouchedPowerBi && tableauChoice && !fontSupport(powerBi).tableau ? tableau : powerBi;
 }
 
 /**
- * Applies one font to both tools. A tool that doesn't ship it gets its own default, so the exported
- * file never names a font that tool can't show.
+ * Applies one font to both tools, for body text, titles, or both. A tool that doesn't ship it gets its
+ * own default, so the exported file never names a font that tool can't show.
  */
-export function applyFont(fonts: { powerBi: { body: string; title: string }; tableau: { body: string; title: string } }, name: string): void {
+export function applyFont(fonts: FontSlots, name: string, role: FontRole | "both" = "both"): void {
   const support = fontSupport(name);
   const powerBi = support.powerBi ? name : DEFAULT_FONTS.powerBi;
   const tableau = support.tableau ? name : DEFAULT_FONTS.tableau;
-  fonts.powerBi.body = fonts.powerBi.title = powerBi;
-  fonts.tableau.body = fonts.tableau.title = tableau;
+  for (const slot of role === "both" ? (["body", "title"] as const) : [role]) {
+    fonts.powerBi[slot] = powerBi;
+    fonts.tableau[slot] = tableau;
+  }
+}
+
+/** Compact label for a select option, since an option can't carry the colored tag a card does. */
+export function fontLabel(name: string): string {
+  const { powerBi, tableau } = fontSupport(name);
+  return `${name} · ${powerBi && tableau ? "both" : powerBi ? "Power BI" : "Tableau"}`;
 }
 
 /** The sentence shown after picking a font. */

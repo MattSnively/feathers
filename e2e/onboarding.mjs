@@ -113,6 +113,8 @@ await nextBtn().click();
 check("step 2 heading and focus", (await h1()) === "Pick a font" && (await activeTag()) === "H1");
 check("one font list, not two groups", (await page.locator(".ob-fonts").count()) === 1 && (await page.locator(".ob-sub").count()) === 0);
 check("26 fonts, each labeled with where it works", (await page.locator(".ob-font").count()) === 26 && (await page.locator(".ob-font", { hasText: "Power BI + Tableau" }).count()) === 7 && (await page.locator(".ob-font", { hasText: "Power BI only" }).count()) === 13 && (await page.locator(".ob-font", { hasText: "Tableau only" }).count()) === 6);
+const edgeOf = (cls) => page.locator(`.ob-font.${cls}`).first().evaluate((e) => getComputedStyle(e).borderTopColor);
+check("card edges are color-coded: yellow Power BI, blue Tableau, green both", (await edgeOf("powerbi")) === "rgb(209, 154, 0)" && (await edgeOf("tableau")) === "rgb(47, 111, 222)" && (await edgeOf("both")) === "rgb(30, 158, 87)", [await edgeOf("powerbi"), await edgeOf("tableau"), await edgeOf("both")].join(" "));
 check("exactly one font is selected", (await page.locator('.ob-font[aria-pressed="true"]').count()) === 1);
 check("the notice starts with the current font", (await page.locator(".ob-font-notice").innerText()).includes("Segoe UI is a Power BI font"));
 check("current fonts are marked", (await page.locator(".ob-font", { hasText: "Segoe UI" }).first().getAttribute("aria-pressed")) === "true");

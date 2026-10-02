@@ -236,7 +236,14 @@ check("clicking a Tableau scatter point jumps to its category color", (await act
 await tab("text");
 check("schema chip follows the tool", (await page.locator(".schema-chip").innerText()).includes("Tableau theme"));
 await tab("text");
-check("Tableau fonts list", (await page.locator('[data-key="font-body"] option').allTextContents()).includes("Tableau Book"));
+check("one font list in the editor for either tool, labeled by tool", (await page.locator('[data-key="font-body"] option').count()) === 26 && (await page.locator('[data-key="font-body"] option').allTextContents()).includes("Tableau Book · Tableau") && (await page.locator('[data-key="font-body"] option').allTextContents()).includes("Arial · both"));
+await page.locator('[data-key="font-body"]').selectOption("Tableau Medium");
+check("a one-tool font in the editor says what the other tool will use", (await page.locator(".font-notice").first().innerText()).includes("Power BI theme will use Segoe UI"));
+await page.locator('[data-key="font-body"]').selectOption("Arial");
+check("a shared font in the editor says it works in both", (await page.locator(".font-notice").first().innerText()).includes("works in both"));
+await page.locator(".tool-tabs button", { hasText: "Power BI" }).click(); await tab("text");
+check("the same list and choice show for Power BI", (await page.locator('[data-key="font-body"]').inputValue()) === "Arial" && (await page.locator('[data-key="font-body"] option').count()) === 26);
+await page.locator(".tool-tabs button", { hasText: "Tableau" }).click(); await tab("text");
 check("no card-value slider for Tableau", (await page.locator('[data-key="size-callout"]').count()) === 0);
 await page.locator('svg rect[aria-label="Edit color 3"]').first().click();
 check("clicking a Tableau bar jumps to its color", (await activeTab()) === "colors" && (await focusKey()) === "cat-2");

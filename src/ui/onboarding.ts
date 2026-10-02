@@ -247,7 +247,7 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
       const { powerBi, tableau } = fontSupport(name);
       const b = h("button", {
         type: "button",
-        class: "ob-font",
+        class: `ob-font ${powerBi && tableau ? "both" : powerBi ? "powerbi" : "tableau"}`,
         "aria-pressed": String(chosenFont === name),
         style: `font-family:${st.family};font-weight:${st.weight}`,
         onclick: () => {
@@ -264,8 +264,12 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
       return b;
     });
     showNotice(chosenFont);
+    // The card edges carry the same information as the tag text, so color is never the only signal.
+    const key = h("div", { class: "ob-font-key", "aria-hidden": "true" },
+      h("span", { class: "powerbi" }, "Power BI"), h("span", { class: "tableau" }, "Tableau"), h("span", { class: "both" }, "Both tools"));
     return [
       notice,
+      key,
       h("div", { class: "ob-fonts" }, ...buttons),
       h("p", { class: "ob-note" }, "Fonts show as installed on your computer. Tableau's own fonts appear as a stand-in unless Tableau is installed."),
     ];
