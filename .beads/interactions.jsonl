@@ -1,0 +1,1 @@
+{"id":"int-fb9424b6","kind":"field_change","created_at":"2026-10-02T04:00:56.2736203Z","actor":"Matt Snively","issue_id":"feathers-5ct.1","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Schemas verified from raw files; fixtures validated and hand-imported successfully by Matt"}}
