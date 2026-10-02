@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "feathers",
+  "project_id": "5a039ef9-83a2-47e5-a951-f256b6d2a6e4"
+}
