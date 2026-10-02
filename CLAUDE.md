@@ -2,9 +2,9 @@
 
 **What:** Static theme editor that exports Power BI theme .json, Tableau theme .json and Tableau Preferences.tps from one palette/fonts/gridlines/backgrounds model, with per-tool import guides.
 **Stack:** Vite + TypeScript (vanilla UI), Vitest. No backend, no accounts.
-**Run:** `npm run dev` (once scaffolded, see epic feathers-5ct)
-**Test:** `npm test`
-**Deploy:** GitHub Pages (MattSnively/feathers); mind the subpath base config.
+**Run:** `npm run dev`
+**Test:** `npm test` (validates exporter output against schemas/ copies of the Power BI 2.157 and Tableau 1.0.0 schemas)
+**Deploy:** GitHub Pages via Actions on push to main, https://mattsnively.github.io/feathers/ (relative Vite base)
 
 Scope decisions and preset hex values live in `bd remember` (run `bd prime`). Fonts are limited to each tool's default fonts. Keep the core embeddable (no framework) for a later playfair.com embed.
 Use `~/AppData/Roaming/npm/bd`, not the stale `~/bin/bd` that shadows it.
