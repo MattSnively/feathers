@@ -1,3 +1,4 @@
+import { changedLines } from "../src/export/lineDiff";
 import { describe, expect, it } from "vitest";
 import { donutAngles, layoutBars, layoutStacked, ringPath, scaleX, scaleY, stackValues, type Plot } from "../src/preview/geometry";
 import { calloutPx, fontStyle, lineAttrs, px, rampColor } from "../src/preview/style";
@@ -144,5 +145,20 @@ describe("rampColor", () => {
   it("clamps out-of-range positions", () => {
     expect(rampColor(["#000000", "#FFFFFF"], 2)).toBe("#FFFFFF");
     expect(rampColor(["#000000", "#FFFFFF"], -1)).toBe("#000000");
+  });
+});
+
+describe("changedLines", () => {
+  it("marks only edited lines", () => {
+    expect([...changedLines("a\nb\nc", "a\nB\nc")]).toEqual([1]);
+  });
+  it("doesn't mark lines below an insertion", () => {
+    expect([...changedLines("a\nb\nc", "a\nx\nb\nc")]).toEqual([1]);
+  });
+  it("counts duplicates, so a repeated line added later is flagged", () => {
+    expect([...changedLines("a\nb", "a\nb\nb")]).toEqual([2]);
+  });
+  it("reports nothing for identical text", () => {
+    expect(changedLines("a\nb", "a\nb").size).toBe(0);
   });
 });

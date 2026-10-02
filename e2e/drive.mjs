@@ -369,6 +369,24 @@ check("back on Overview the full suite returns", (await page.locator(".pv-tab .p
 await page.reload();
 check("page choice is a view preference and is not saved", (await page.locator('.page-tab[aria-pressed="true"]').innerText()) === "Overview");
 
+// ---- Live code panel ---------------------------------------------------------------------------
+await pickTool("Power BI");
+await page.locator(".code-toggle").click();
+check("Code panel opens with the Power BI file", (await page.locator(".code-panel").isVisible()) && (await page.locator(".code-tab").count()) === 1 && (await page.locator(".code-tab").innerText()).endsWith(".powerbi.json"));
+check("Code panel shows valid JSON", (() => { try { JSON.parse(""); } catch {} return true; })() && await page.locator(".code-text").evaluateAll((els) => { try { JSON.parse(els.map((e) => e.textContent).join("\n")); return true; } catch { return false; } }));
+check("nothing is highlighted before an edit", (await page.locator(".code-line.changed").count()) === 0);
+await hexInput("cat-0").fill("#123456");
+// The first color feeds dataColors, tableAccent and the card callout color, so three lines change.
+check("editing a color highlights exactly the three lines that use it", (await page.locator(".code-line.changed").count()) === 3 && (await page.locator(".code-line.changed").allInnerTexts()).every((t) => t.toLowerCase().includes("#123456")), String(await page.locator(".code-line.changed").count()));
+const fr = await box(".pv-frame"); const sc = await box(".stage-scroll");
+check("preview refits beside the panel", fr.width <= sc.width + 1, `frame ${fr.width} stage ${sc.width}`);
+await pickTool("Tableau");
+check("Tableau shows both of its files", (await page.locator(".code-tab").count()) === 2);
+await page.locator(".code-tab").nth(1).click();
+check("the palettes tab shows the .tps XML", (await page.locator(".code-text").first().innerText()).includes("<?xml") || (await page.locator(".code-body").innerText()).includes("<preferences"));
+await page.locator(".code-toggle").click();
+check("Code panel closes", !(await page.locator(".code-panel").isVisible()));
+
 check("no console errors", consoleErrors.length === 0, consoleErrors.join(" | "));
 
 await browser.close();

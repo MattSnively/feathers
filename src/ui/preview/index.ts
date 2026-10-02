@@ -4,6 +4,7 @@ import { h } from "../dom";
 import { icon } from "../icons";
 import { isAvailable, resolveKey } from "../visibility";
 import type { Edit } from "./chart";
+import { buildCodePanel } from "./codePanel";
 import { PAGES, type PreviewPage } from "./pages";
 import { powerBiPreview } from "./powerbi";
 import { tableauPreview } from "./tableau";
@@ -30,6 +31,7 @@ export function buildPreview(store: Store, reveal: (key: string) => void): HTMLE
   const status = h("p", { class: "pv-status", role: "status" });
   const caption = h("p", { class: "hint pv-caption" });
   const scroller = h("div", { class: "stage-scroll" }, frame, caption, status);
+  const code = buildCodePanel(store);
   const root = h("main", { class: "stage", id: "preview", "aria-label": "Preview" });
 
   let zoomChoice: "fit" | number = "fit";
@@ -109,7 +111,20 @@ export function buildPreview(store: Store, reveal: (key: string) => void): HTMLE
       },
     }, p.label)));
 
-  const toolbar = h("div", { class: "stage-toolbar" }, pageTabs, zoomSelect, hintsBtn);
+  const codeBtn = h("button", {
+    type: "button",
+    class: "btn ghost code-toggle",
+    "aria-pressed": "false",
+    title: "Show the generated file beside the preview",
+    onclick: () => {
+      const on = codeBtn.getAttribute("aria-pressed") !== "true";
+      codeBtn.setAttribute("aria-pressed", String(on));
+      root.classList.toggle("code-open", on);
+      code.setOpen(on);
+    },
+  }, icon("code", 16), "Code");
+
+  const toolbar = h("div", { class: "stage-toolbar" }, pageTabs, zoomSelect, hintsBtn, codeBtn);
 
   /**
    * Scales the report to the stage on wide screens; on narrow ones it reflows at full width instead.
@@ -142,7 +157,7 @@ export function buildPreview(store: Store, reveal: (key: string) => void): HTMLE
     applyZoom();
   }
 
-  root.append(h("h2", { class: "visually-hidden" }, "Preview"), toolbar, scroller);
+  root.append(h("h2", { class: "visually-hidden" }, "Preview"), toolbar, h("div", { class: "stage-body" }, scroller, code.element));
   store.subscribe(render);
   render();
   new ResizeObserver(applyZoom).observe(scroller);

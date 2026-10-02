@@ -18,6 +18,7 @@ const PATHS = {
   pencil: ["M4 20h4L19 9l-4-4L4 16v4z"],
   grip: ["M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01"],
   check: ["M5 12.5l4.5 4.5L19 7.5"],
+  code: ["M8 7l-5 5 5 5", "M16 7l5 5-5 5", "M14 4l-4 16"],
   upload: ["M12 16V4", "M7.5 8.5L12 4l4.5 4.5", "M5 20h14"],
 } as const;
 
