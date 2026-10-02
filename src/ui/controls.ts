@@ -1,248 +1,338 @@
+import { analyzeTheme } from "../a11y/analyze";
 import { POWER_BI_FONTS, TABLEAU_FONTS } from "../model/fonts";
-import type { LineStyle } from "../model/theme";
+import type { LineStyle, Theme } from "../model/theme";
 import type { Store } from "../state/store";
+import { buildA11yPanel } from "./a11yPanel";
 import { h, rebuild } from "./dom";
-import { checkboxField, colorField, numberField, selectField } from "./fields";
+import { colorField, segmentedControl, selectField, sliderField, switchField } from "./fields";
+import { icon, type IconName } from "./icons";
+import { colorEditor } from "./swatches";
 import { isAvailable } from "./visibility";
 
-type PaletteTab = "categorical" | "sequential" | "diverging";
+type TabId = "colors" | "text" | "lines" | "canvas" | "checks";
+type PaletteKind = "categorical" | "sequential" | "diverging";
+
+const TABS: { id: TabId; label: string; icon: IconName; blurb: string }[] = [
+  { id: "colors", label: "Colors", icon: "palette", blurb: "Click anything in the preview to jump to its setting." },
+  { id: "text", label: "Text", icon: "type", blurb: "Only fonts that ship with the tool, so what you see is what imports." },
+  { id: "lines", label: "Lines", icon: "lines", blurb: "Gridlines and the zero line." },
+  { id: "canvas", label: "Canvas", icon: "frame", blurb: "Backgrounds behind and inside your visuals." },
+  { id: "checks", label: "Checks", icon: "shield", blurb: "Contrast and color-blindness checks on this theme." },
+];
+
+const PALETTE_KINDS = [
+  ["categorical", "Categorical"],
+  ["sequential", "Sequential"],
+  ["diverging", "Diverging"],
+] as const;
+
+const LINE_STYLES = [
+  ["solid", "Solid"],
+  ["dashed", "Dashed"],
+  ["dotted", "Dotted"],
+] as const;
 
 /** Tableau's Edit Colors dialog only shows 20 colors of a palette. */
 const MAX_CATEGORICAL = 20;
-const LINE_STYLES: readonly LineStyle[] = ["solid", "dashed", "dotted"];
 
-/** Which panel holds the control a data-key belongs to, so clicking the preview can open it first. */
-function panelFor(key: string): string | null {
+/** Which tab holds the control a data-key belongs to, so clicking the preview can open it first. */
+function tabFor(key: string): TabId | null {
   if (/^(cat|status|text|sequential|diverging)-/.test(key)) return "colors";
-  if (/^(font|size)-/.test(key)) return "fonts";
+  if (/^(font|size)-/.test(key)) return "text";
   if (/^(gridline|zeroline)/.test(key)) return "lines";
-  if (key.startsWith("bg-")) return "backgrounds";
+  if (key.startsWith("bg-")) return "canvas";
   return null;
 }
 
-export function buildControls(store: Store): { element: HTMLElement; reveal: (key: string) => void } {
-  const root = h("div", { class: "controls" });
-  let tab: PaletteTab = "categorical";
-  let focusKey: string | null = null;
-  const collapsed = new Set<string>();
+const keyOf = (kind: PaletteKind, i: number) => `${kind === "categorical" ? "cat" : kind}-${i}`;
+const labelOf = (kind: PaletteKind, i: number) =>
+  kind === "categorical" ? `Color ${i + 1}` : (kind === "sequential" ? ["Low end", "High end"] : ["Low end", "Center", "High end"])[i]!;
 
-  const panel = (id: string, title: string, ...body: (Node | null)[]) =>
-    h(
-      "details",
-      { class: "panel", open: !collapsed.has(id), ontoggle: (e: Event) => {
-        const el = e.currentTarget as HTMLDetailsElement;
-        if (el.open) collapsed.delete(id);
-        else collapsed.add(id);
-      } },
-      h("summary", {}, title),
-      h("div", { class: "panel-body" }, ...body),
-    );
+function setColor(t: Theme, kind: PaletteKind, i: number, hex: string) {
+  if (kind === "categorical") t.palette.categorical[i] = hex;
+  else t.palette[kind][i] = hex;
+}
+
+export function buildSidebar(store: Store): { rail: HTMLElement; panel: HTMLElement; reveal: (key: string) => void } {
+  const panel = h("div", { class: "panel", id: "settings-panel", role: "region", "aria-label": "Settings" });
+  let tab: TabId = "colors";
+  let paletteKind: PaletteKind = "categorical";
+  const selected: Record<PaletteKind, number> = { categorical: 0, sequential: 0, diverging: 0 };
+  let focusKey: string | null = null;
+
+  const a11y = buildA11yPanel(store);
 
   const hint = (text: string) => h("p", { class: "hint" }, text);
+  const section = (title: string, aside: string | null, ...body: (Node | null)[]) =>
+    h("section", { class: "section" },
+      h("div", { class: "section-head" }, h("h3", {}, title), aside ? h("span", { class: "aside" }, aside) : null),
+      h("div", { class: "section-body" }, ...body));
 
-  const move = (from: number, to: number, direction: "up" | "down") => {
-    const last = store.get().theme.palette.categorical.length - 1;
-    // Keep focus on the same kind of button so repeated key presses keep moving the same row.
-    const stuck = direction === "up" ? to === 0 : to === last;
-    focusKey = `cat-${to}-${stuck ? (direction === "up" ? "down" : "up") : direction}`;
-    store.updateTheme((t) => {
-      const arr = t.palette.categorical;
-      const [moved] = arr.splice(from, 1);
-      arr.splice(to, 0, moved!);
-    }, "structure");
-  };
+  // ---- Colors ---------------------------------------------------------------------------------
 
-  const categoricalRows = () => {
-    const cat = store.get().theme.palette.categorical;
-    const rows = cat.map((color, i) => {
-      const row = h("div", { class: "swatch-row" });
-      const handle = h("span", {
-        class: "drag-handle",
-        draggable: true,
-        title: "Drag to reorder",
-        "aria-hidden": "true",
-        ondragstart: (e: DragEvent) => {
+  function paletteSection(): HTMLElement {
+    const kind = paletteKind;
+    const initial = store.get().theme.palette;
+    const colors = kind === "categorical" ? initial.categorical : initial[kind];
+    selected[kind] = Math.min(selected[kind], colors.length - 1);
+    const sel = selected[kind];
+    const isCat = kind === "categorical";
+
+    const move = (from: number, to: number, button?: "move-earlier" | "move-later") => {
+      const last = colors.length - 1;
+      // Keep focus on the same kind of button so repeated key presses keep moving the same color.
+      if (button) {
+        const stuck = button === "move-earlier" ? to === 0 : to === last;
+        focusKey = stuck ? (button === "move-earlier" ? "move-later" : "move-earlier") : button;
+      } else {
+        focusKey = `chip-categorical-${to}`;
+      }
+      selected.categorical = to;
+      store.updateTheme((t) => {
+        const [moved] = t.palette.categorical.splice(from, 1);
+        t.palette.categorical.splice(to, 0, moved!);
+      }, "structure");
+    };
+
+    const chips = colors.map((hex, i) => {
+      const chip = h("button", {
+        type: "button",
+        class: "sw",
+        style: `--c:${hex}`,
+        draggable: isCat,
+        "aria-pressed": String(i === sel),
+        "aria-label": `Select ${labelOf(kind, i)}, ${hex}`,
+        "data-key": `chip-${kind}-${i}`,
+        onclick: () => {
+          selected[kind] = i;
+          chips.forEach((c, j) => c.setAttribute("aria-pressed", String(j === i)));
+          renderEditor();
+        },
+      }, h("span", { class: "sw-n" }, String(i + 1)));
+      if (isCat) {
+        chip.addEventListener("dragstart", (e) => {
           e.dataTransfer?.setData("text/plain", String(i));
           if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
-          e.dataTransfer?.setDragImage(row, 0, 0);
-        },
-      }, "⋮⋮");
-      row.addEventListener("dragover", (e) => e.preventDefault());
-      row.addEventListener("drop", (e) => {
-        e.preventDefault();
-        const from = Number(e.dataTransfer?.getData("text/plain"));
-        if (Number.isInteger(from) && from !== i) move(from, i, from < i ? "down" : "up");
-      });
-      row.append(
-        handle,
-        colorField(`Color ${i + 1}`, color, (hex) => store.updateTheme((t) => { t.palette.categorical[i] = hex; }), { key: `cat-${i}` }),
-        h("button", { type: "button", class: "icon-btn", "aria-label": `Move color ${i + 1} up`, disabled: i === 0, "data-key": `cat-${i}-up`, onclick: () => move(i, i - 1, "up") }, "↑"),
-        h("button", { type: "button", class: "icon-btn", "aria-label": `Move color ${i + 1} down`, disabled: i === cat.length - 1, "data-key": `cat-${i}-down`, onclick: () => move(i, i + 1, "down") }, "↓"),
-        h("button", {
-          type: "button",
-          class: "icon-btn",
-          "aria-label": `Remove color ${i + 1}`,
-          disabled: cat.length === 1,
-          "data-key": `cat-${i}-remove`,
-          onclick: () => {
-            focusKey = `cat-${Math.min(i, cat.length - 2)}`;
-            store.updateTheme((t) => { t.palette.categorical.splice(i, 1); }, "structure");
-          },
-        }, "×"),
-      );
-      return row;
+        });
+        chip.addEventListener("dragover", (e) => e.preventDefault());
+        chip.addEventListener("drop", (e) => {
+          e.preventDefault();
+          const from = Number(e.dataTransfer?.getData("text/plain"));
+          if (Number.isInteger(from) && from !== i) move(from, i);
+        });
+      }
+      return chip;
     });
-    const atMax = cat.length >= MAX_CATEGORICAL;
-    return [
-      ...rows,
-      h("button", {
-        type: "button",
-        class: "secondary",
-        disabled: atMax,
-        onclick: () => {
-          focusKey = `cat-${cat.length}`;
-          store.updateTheme((t) => { t.palette.categorical.push("#888888"); }, "structure");
-        },
-      }, atMax ? `Maximum ${MAX_CATEGORICAL} colors` : "Add color"),
-      hint(`Colors apply in order. The first one is also Tableau's single mark color. Tableau shows up to ${MAX_CATEGORICAL}.`),
-    ];
-  };
 
-  const rampRows = (kind: "sequential" | "diverging", labels: string[]) => {
-    const colors = store.get().theme.palette[kind];
-    return [
-      ...labels.map((label, i) =>
-        colorField(label, colors[i]!, (hex) => store.updateTheme((t) => { t.palette[kind][i] = hex; }), { key: `${kind}-${i}` })),
-      hint(kind === "sequential"
-        ? "Tableau fills in the shades between the two ends."
-        : "Tableau blends each end into the center color."),
-    ];
-  };
+    const strip = isCat ? null : h("div", { class: "ramp", "aria-hidden": "true" });
+    const paintStrip = (list: readonly string[]) => strip?.style.setProperty("background", `linear-gradient(to right, ${list.join(", ")})`);
+    paintStrip(colors);
 
-  const colorsPanel = () => {
-    const tabs = (["categorical", "sequential", "diverging"] as const).map((name) =>
-      h("button", {
-        type: "button",
-        class: "seg",
-        "aria-pressed": String(tab === name),
-        onclick: () => { tab = name; render(); },
-      }, name[0]!.toUpperCase() + name.slice(1)));
+    const editor = h("div", { class: "color-editor" });
+    function renderEditor() {
+      const i = selected[kind];
+      const hex = (kind === "categorical" ? store.get().theme.palette.categorical : store.get().theme.palette[kind])[i]!;
+      const apply = (value: string) => {
+        store.updateTheme((t) => setColor(t, kind, i, value));
+        chips[i]!.style.setProperty("--c", value);
+        chips[i]!.setAttribute("aria-label", `Select ${labelOf(kind, i)}, ${value}`);
+        if (kind !== "categorical") paintStrip(store.get().theme.palette[kind]);
+      };
+      const n = colors.length;
+      editor.replaceChildren(
+        h("div", { class: "color-editor-head" },
+          h("strong", {}, "Selected color"),
+          isCat
+            ? h("div", { class: "btn-row" },
+                h("button", { type: "button", class: "icon-btn", title: "Move earlier", "aria-label": `Move ${labelOf(kind, i)} earlier`, disabled: i === 0, "data-key": "move-earlier", onclick: () => move(i, i - 1, "move-earlier") }, icon("left", 18)),
+                h("button", { type: "button", class: "icon-btn", title: "Move later", "aria-label": `Move ${labelOf(kind, i)} later`, disabled: i === n - 1, "data-key": "move-later", onclick: () => move(i, i + 1, "move-later") }, icon("right", 18)),
+                h("button", {
+                  type: "button",
+                  class: "icon-btn danger",
+                  title: "Remove color",
+                  "aria-label": `Remove ${labelOf(kind, i)}`,
+                  disabled: n === 1,
+                  "data-key": "remove-color",
+                  onclick: () => {
+                    selected.categorical = Math.min(i, n - 2);
+                    focusKey = `chip-categorical-${selected.categorical}`;
+                    store.updateTheme((t) => { t.palette.categorical.splice(i, 1); }, "structure");
+                  },
+                }, icon("close", 18)))
+            : null),
+        colorEditor(labelOf(kind, i), hex, apply, { key: keyOf(kind, i) }),
+      );
+    }
+    renderEditor();
+
+    const add = isCat
+      ? h("button", {
+          type: "button",
+          class: "sw sw-add",
+          "aria-label": colors.length >= MAX_CATEGORICAL ? `Maximum ${MAX_CATEGORICAL} colors` : "Add color",
+          title: colors.length >= MAX_CATEGORICAL ? `Tableau shows at most ${MAX_CATEGORICAL} colors` : "Add color",
+          disabled: colors.length >= MAX_CATEGORICAL,
+          "data-key": "add-color",
+          onclick: () => {
+            selected.categorical = colors.length;
+            focusKey = `chip-categorical-${colors.length}`;
+            store.updateTheme((t) => { t.palette.categorical.push("#888888"); }, "structure");
+          },
+        }, icon("plus", 18))
+      : null;
+
+    return section("Data colors", isCat ? "Drag to reorder" : null,
+      segmentedControl(PALETTE_KINDS, () => paletteKind, (k) => { paletteKind = k; render(); }, { label: "Palette type", class: "wide" }),
+      h("div", { class: "swatch-grid", role: "group", "aria-label": `${kind} colors` }, ...chips, add),
+      strip,
+      editor,
+      hint(isCat
+        ? "Colors apply in order. The first is also Tableau's single mark color."
+        : kind === "sequential" ? "Tableau fills in the shades between the two ends." : "Tableau blends each end into the center color."));
+  }
+
+  function colorsTab(): Node[] {
     const { theme, mode } = store.get();
     const roles = (group: "status" | "text", items: [string, string][]) =>
       items.map(([key, label]) =>
         colorField(label, (theme[group] as Record<string, string>)[key]!,
           (hex) => store.updateTheme((t) => { (t[group] as Record<string, string>)[key] = hex; }), { key: `${group}-${key}` }));
-    return panel("colors", "Colors",
-      h("div", { class: "seg-group", role: "group", "aria-label": "Palette type" }, ...tabs),
-      ...(tab === "categorical" ? categoricalRows()
-        : tab === "sequential" ? rampRows("sequential", ["Low end", "High end"])
-        : rampRows("diverging", ["Low end", "Center", "High end"])),
+    return [
+      paletteSection(),
       ...(mode === "advanced"
         ? [
-            h("h3", {}, "Status colors"),
-            hint("Used by Power BI KPI and waterfall visuals and conditional-format gradients."),
-            ...roles("status", [["good", "Good"], ["neutral", "Neutral"], ["bad", "Bad"]]),
-            h("h3", {}, "Text colors"),
-            ...roles("text", [["primary", "Primary text"], ["secondary", "Secondary text"], ["muted", "Muted text"]]),
+            section("Status", "KPI arrows, waterfall, scale", ...roles("status", [["good", "Good"], ["neutral", "Neutral"], ["bad", "Bad"]])),
+            section("Text", "Titles, labels, captions", ...roles("text", [["primary", "Primary"], ["secondary", "Secondary"], ["muted", "Muted"]])),
           ]
         : []),
-    );
-  };
+    ];
+  }
 
-  const fontsPanel = () => {
+  // ---- Text -----------------------------------------------------------------------------------
+
+  function textTab(): Node[] {
     const { theme, tool, mode } = store.get();
     const key = tool === "powerbi" ? "powerBi" : "tableau";
     const list = tool === "powerbi" ? POWER_BI_FONTS : TABLEAU_FONTS;
-    const title = `Fonts (${tool === "powerbi" ? "Power BI" : "Tableau"})`;
     if (mode === "beginner") {
-      return panel("fonts", title,
-        hint("Only fonts that ship with the tool, so what you see is what imports. One font is used for all text; Advanced sets titles and sizes separately."),
+      return [section(`Font (${tool === "powerbi" ? "Power BI" : "Tableau"})`, "All text",
         selectField("Font", list, theme.fonts[key].body, (v) => store.updateTheme((t) => { t.fonts[key].body = v; t.fonts[key].title = v; }), { key: "font-body" }),
-      );
+        hint("One font is used for all text. Advanced sets titles and sizes separately."))];
     }
-    return panel("fonts", title,
-      hint("Only fonts that ship with the tool, so what you see is what imports."),
-      selectField("Body font", list, theme.fonts[key].body, (v) => store.updateTheme((t) => { t.fonts[key].body = v; }), { key: "font-body" }),
-      selectField("Title font", list, theme.fonts[key].title, (v) => store.updateTheme((t) => { t.fonts[key].title = v; }), { key: "font-title" }),
-      numberField("Body size (pt)", theme.sizes.body, { min: 1, max: 99 }, (n) => store.updateTheme((t) => { t.sizes.body = n; }), { key: "size-body" }),
-      numberField("Title size (pt)", theme.sizes.title, { min: 1, max: 99 }, (n) => store.updateTheme((t) => { t.sizes.title = n; }), { key: "size-title" }),
-      tool === "powerbi"
-        ? numberField("Card value size (pt)", theme.sizes.callout, { min: 1, max: 99 }, (n) => store.updateTheme((t) => { t.sizes.callout = n; }), { key: "size-callout" })
-        : null,
-    );
-  };
-
-  const lineEditor = (id: "gridline" | "zeroline", title: string, withWidth: boolean) => {
-    const line = store.get().theme[id];
     return [
-      h("h3", {}, title),
-      checkboxField("Show", line.visible, (v) => store.updateTheme((t) => { t[id].visible = v; })),
-      selectField("Style", LINE_STYLES, line.style, (v) => store.updateTheme((t) => { t[id].style = v as LineStyle; })),
-      withWidth ? numberField("Width (1-5)", line.width, { min: 1, max: 5 }, (n) => store.updateTheme((t) => { t[id].width = n; })) : null,
-      colorField("Color", line.color, (hex) => store.updateTheme((t) => { t[id].color = hex; }), { key: `${id}-color` }),
-    ];
-  };
+      section("Body", "Labels, axes, tables",
+        selectField("Font", list, theme.fonts[key].body, (v) => store.updateTheme((t) => { t.fonts[key].body = v; }), { key: "font-body" }),
+        sliderField("Font size", theme.sizes.body, { min: 8, max: 24, unit: "pt", key: "size-body" }, (n) => store.updateTheme((t) => { t.sizes.body = n; }))),
+      section("Titles", "Page and visual titles",
+        selectField("Font", list, theme.fonts[key].title, (v) => store.updateTheme((t) => { t.fonts[key].title = v; }), { key: "font-title" }),
+        sliderField("Font size", theme.sizes.title, { min: 10, max: 36, unit: "pt", key: "size-title" }, (n) => store.updateTheme((t) => { t.sizes.title = n; }))),
+      tool === "powerbi"
+        ? section("Card values", "Big KPI numbers",
+            sliderField("Font size", theme.sizes.callout, { min: 16, max: 72, unit: "pt", key: "size-callout" }, (n) => store.updateTheme((t) => { t.sizes.callout = n; })))
+        : null,
+    ].filter((x): x is HTMLElement => x !== null);
+  }
 
-  // Beginner gets gridlines without width, and no zero line.
-  const linesPanel = () =>
-    store.get().mode === "advanced"
-      ? panel("lines", "Lines", ...lineEditor("gridline", "Gridlines", true), ...lineEditor("zeroline", "Zero line", true))
-      : panel("lines", "Lines", ...lineEditor("gridline", "Gridlines", false));
+  // ---- Lines ----------------------------------------------------------------------------------
 
-  const backgroundsPanel = () => {
+  function lineSection(id: "gridline" | "zeroline", title: string, aside: string, withWidth: boolean): HTMLElement {
+    const line = store.get().theme[id];
+    return section(title, aside,
+      switchField("Show", line.visible, (v) => store.updateTheme((t) => { t[id].visible = v; })),
+      h("div", { class: "field" }, h("span", { class: "label" }, "Style"),
+        segmentedControl(LINE_STYLES, () => store.get().theme[id].style, (v) => store.updateTheme((t) => { t[id].style = v as LineStyle; }), { label: `${title} style`, class: "wide" })),
+      withWidth ? sliderField("Width", line.width, { min: 1, max: 5, unit: "px", key: `${id}-width` }, (n) => store.updateTheme((t) => { t[id].width = n; })) : null,
+      colorField("Color", line.color, (hex) => store.updateTheme((t) => { t[id].color = hex; }), { key: `${id}-color` }));
+  }
+
+  function linesTab(): Node[] {
+    // Beginner gets gridlines without width, and no zero line.
+    return store.get().mode === "advanced"
+      ? [lineSection("gridline", "Gridlines", "Behind the data", true), lineSection("zeroline", "Zero line", "Tableau charts", true)]
+      : [lineSection("gridline", "Gridlines", "Behind the data", false)];
+  }
+
+  // ---- Canvas ---------------------------------------------------------------------------------
+
+  function canvasTab(): Node[] {
     const { theme: { background }, mode, tool } = store.get();
+    const show = (key: string) => isAvailable(`bg-${key}`, mode, tool);
     const field = (key: "canvas" | "page" | "container", label: string) =>
       colorField(label, background[key], (hex) => store.updateTheme((t) => { t.background[key] = hex; }), { key: `bg-${key}` });
-    // Beginner only lists backgrounds the selected tool uses; Tableau has no canvas or page.
-    const show = (key: string) => isAvailable(`bg-${key}`, mode, tool);
-    return panel("backgrounds", "Backgrounds",
-      show("canvas") ? field("canvas", "Canvas (Power BI)") : null,
-      show("page") ? field("page", "Page (Power BI)") : null,
-      field("container", "Chart area"),
-      hint("Chart area is the visual container in Power BI and the view background in Tableau."),
-    );
-  };
+    return [
+      section("Backgrounds", null,
+        show("canvas") ? field("canvas", "Canvas (Power BI)") : null,
+        show("page") ? field("page", "Page (Power BI)") : null,
+        field("container", "Chart area"),
+        hint("Chart area is the visual container in Power BI and the view background in Tableau.")),
+    ];
+  }
 
-  const namePanel = () => {
-    const input = h("input", {
-      id: "theme-name",
-      type: "text",
-      value: store.get().theme.name,
-      maxLength: 60,
-      oninput: () => store.updateTheme((t) => { t.name = input.value; }),
-    });
-    return panel("name", "Theme name",
-      h("div", { class: "field" }, h("label", { htmlFor: "theme-name" }, "Name"), input),
-      hint("Also names the downloaded files."),
-    );
-  };
+  // ---- Shell ----------------------------------------------------------------------------------
+
+  const bodyFor = (id: TabId): Node[] =>
+    id === "colors" ? colorsTab() : id === "text" ? textTab() : id === "lines" ? linesTab() : id === "canvas" ? canvasTab() : [a11y];
+
+  const railButtons = new Map<TabId, HTMLButtonElement>();
+  const badge = h("span", { class: "rail-badge" });
+  const rail = h("nav", { class: "rail", "aria-label": "Settings sections" },
+    ...TABS.map((t) => {
+      const btn = h("button", {
+        type: "button",
+        class: "rail-btn",
+        "data-tab": t.id,
+        "aria-controls": "settings-panel",
+        onclick: () => { tab = t.id; render(); },
+      }, icon(t.icon, 22), h("span", { class: "rail-label" }, t.label), t.id === "checks" ? badge : null);
+      railButtons.set(t.id, btn);
+      return btn;
+    }));
+
+  function syncRail() {
+    railButtons.forEach((btn, id) => btn.setAttribute("aria-pressed", String(id === tab)));
+  }
+  function syncBadge() {
+    const n = analyzeTheme(store.get().theme).findings.length;
+    badge.textContent = n > 0 ? String(n) : "";
+    badge.hidden = n === 0;
+    railButtons.get("checks")?.setAttribute("aria-label", n > 0 ? `Checks, ${n} to review` : "Checks, no problems found");
+  }
 
   function render() {
     const key = focusKey;
     focusKey = null;
-    const more = store.get().mode === "beginner"
-      ? [h("p", { class: "hint more-hint" }, "Switch to Advanced for text and status colors, font sizes, line widths and the zero line.")]
-      : [];
-    rebuild(root, () => [namePanel(), colorsPanel(), fontsPanel(), linesPanel(), backgroundsPanel(), ...more], key);
+    const meta = TABS.find((t) => t.id === tab)!;
+    const more = store.get().mode === "beginner" && tab !== "checks"
+      ? h("p", { class: "hint more-hint" }, "More settings are in Advanced: text and status colors, font sizes, line widths and the zero line.")
+      : null;
+    rebuild(panel, () => [
+      h("header", { class: "panel-head" }, h("h2", {}, meta.label), hint(meta.blurb)),
+      h("div", { class: "panel-body" }, ...bodyFor(tab), more),
+    ], key);
+    syncRail();
   }
 
-  /** Opens the panel for `key`, switches palette tab if needed, and moves focus to that control. */
+  /** Switches to the right tab, selects the swatch if needed, and moves focus to the control. */
   function reveal(key: string) {
     const { mode, tool } = store.get();
-    const panelId = panelFor(key);
-    if (!panelId || !isAvailable(key, mode, tool)) return;
-    collapsed.delete(panelId);
-    if (key.startsWith("cat-")) tab = "categorical";
-    else if (key.startsWith("sequential-")) tab = "sequential";
-    else if (key.startsWith("diverging-")) tab = "diverging";
+    const target = tabFor(key);
+    if (!target || !isAvailable(key, mode, tool)) return;
+    tab = target;
+    const m = /^(cat|sequential|diverging)-(\d+)$/.exec(key);
+    if (m) {
+      paletteKind = m[1] === "cat" ? "categorical" : (m[1] as PaletteKind);
+      selected[paletteKind] = Number(m[2]);
+    }
     focusKey = key;
     render();
-    root.querySelector<HTMLElement>(`[data-key="${CSS.escape(key)}"]`)?.scrollIntoView({ block: "center" });
+    panel.querySelector<HTMLElement>(`[data-key="${CSS.escape(key)}"]`)?.scrollIntoView({ block: "center" });
   }
 
   store.subscribe((_state, kind) => {
+    syncBadge();
     if (kind === "structure") render();
   });
+  syncBadge();
   render();
-  return { element: root, reveal };
+  return { rail, panel, reveal };
 }

@@ -2,10 +2,11 @@ import type { Theme } from "../model/theme";
 import { blank } from "../presets/blank";
 import { okabeIto, playfair, tolMuted } from "../presets";
 import type { Mode, Store, Tool } from "../state/store";
-import { buildA11yPanel } from "./a11yPanel";
-import { buildControls } from "./controls";
+import { buildSidebar } from "./controls";
 import { h } from "./dom";
 import { buildExportBar } from "./exportBar";
+import { segmentedControl } from "./fields";
+import { icon, logoMark } from "./icons";
 import { buildPreview } from "./preview";
 
 const STARTING_POINTS: [string, Theme][] = [
@@ -15,43 +16,26 @@ const STARTING_POINTS: [string, Theme][] = [
   ["Start from scratch", blank],
 ];
 
-const TOOLS: [Tool, string][] = [
+const TOOLS = [
   ["powerbi", "Power BI"],
   ["tableau", "Tableau"],
-];
+] as const;
 
-const MODES: [Mode, string][] = [
+const MODES = [
   ["beginner", "Beginner"],
   ["advanced", "Advanced"],
-];
+] as const;
 
-/** Segmented toggle; buttons stay in place and only aria-pressed changes, so keyboard focus is never lost. */
-function segmented<T extends string>(
-  store: Store,
-  label: string,
-  options: [T, string][],
-  current: () => T,
-  choose: (value: T) => void,
-): HTMLElement {
-  const labelId = `seg-${label.replace(/\W+/g, "-").toLowerCase()}`;
-  const buttons = options.map(([value, text]) => h("button", { type: "button", class: "seg", onclick: () => choose(value) }, text));
-  const sync = () => buttons.forEach((b, i) => b.setAttribute("aria-pressed", String(options[i]![0] === current())));
-  store.subscribe(sync);
-  sync();
-  return h("div", { class: "field" },
-    h("span", { class: "label", id: labelId }, label),
-    h("div", { class: "seg-group", role: "group", "aria-labelledby": labelId }, ...buttons));
-}
-
-const toolToggle = (store: Store) =>
-  segmented(store, "I'm building for", TOOLS, () => store.get().tool, (t) => store.setTool(t));
-
-const modeToggle = (store: Store) =>
-  segmented(store, "Detail level", MODES, () => store.get().mode, (m) => store.setMode(m));
+const SCHEMA_LABEL: Record<Tool, string> = {
+  powerbi: "Power BI schema 2.157",
+  tableau: "Tableau theme 1.0.0",
+};
 
 function presetPicker(store: Store): HTMLElement {
   const select = h("select", {
     id: "preset",
+    class: "select compact",
+    "aria-label": "Start from",
     onchange: () => {
       const choice = STARTING_POINTS[Number(select.value)];
       if (choice) store.loadTheme(choice[1]);
@@ -59,48 +43,68 @@ function presetPicker(store: Store): HTMLElement {
       select.value = "";
     },
   },
-    h("option", { value: "", selected: true, disabled: true }, "Choose a starting point"),
+    h("option", { value: "", selected: true, disabled: true }, "Start from…"),
     ...STARTING_POINTS.map(([label], i) => h("option", { value: String(i) }, label)));
-  return h("div", { class: "field" }, h("label", { htmlFor: "preset" }, "Start from"), select);
+  return select;
 }
 
-/** Swatch strips: a quick read of the whole palette until the full previews arrive. */
-function paletteStrips(store: Store): HTMLElement {
-  const root = h("div", { class: "strips" });
-  const render = () => {
-    const { categorical, sequential, diverging } = store.get().theme.palette;
-    root.replaceChildren(
-      h("p", { class: "strip-label" }, "Categorical"),
-      h("div", { class: "chips" }, ...categorical.map((c, i) =>
-        h("span", { class: "chip", style: `background:${c}`, title: c, role: "img", "aria-label": `Color ${i + 1}: ${c}` }))),
-      h("p", { class: "strip-label" }, "Sequential"),
-      h("div", { class: "ramp", role: "img", "aria-label": `Sequential from ${sequential[0]} to ${sequential[1]}`,
-        style: `background:linear-gradient(to right, ${sequential.join(", ")})` }),
-      h("p", { class: "strip-label" }, "Diverging"),
-      h("div", { class: "ramp", role: "img", "aria-label": `Diverging from ${diverging[0]} through ${diverging[1]} to ${diverging[2]}`,
-        style: `background:linear-gradient(to right, ${diverging.join(", ")})` }),
-    );
-  };
-  store.subscribe(render);
-  render();
-  return root;
+function themeName(store: Store): HTMLElement {
+  const input = h("input", {
+    id: "theme-name",
+    class: "name-input",
+    type: "text",
+    value: store.get().theme.name,
+    maxLength: 60,
+    placeholder: "Untitled theme",
+    "aria-label": "Theme name",
+    title: "Also names the downloaded files",
+    oninput: () => store.updateTheme((t) => { t.name = input.value; }),
+  });
+  // A preset load changes the name from outside; don't fight the user while they're typing in it.
+  store.subscribe((state) => {
+    if (document.activeElement !== input) input.value = state.theme.name;
+  });
+  return h("div", { class: "name-wrap" }, input);
+}
+
+function schemaChip(store: Store): HTMLElement {
+  const chip = h("span", { class: "chip schema-chip" }, h("span", { class: "dot", "aria-hidden": "true" }), h("span", {}));
+  const sync = () => { chip.lastElementChild!.textContent = SCHEMA_LABEL[store.get().tool]; };
+  store.subscribe(sync);
+  sync();
+  return chip;
+}
+
+/** Right-hand sheet holding the three downloads and the import guides. */
+function buildDrawer(store: Store) {
+  const close = h("button", { type: "button", class: "icon-btn drawer-close", "aria-label": "Close downloads", onclick: () => dialog.close() }, icon("close", 20));
+  const dialog = h("dialog", { class: "drawer", "aria-labelledby": "export-title" },
+    h("div", { class: "drawer-inner" }, close, buildExportBar(store)));
+  // Clicking the dimmed area outside the sheet lands on the <dialog> itself.
+  dialog.addEventListener("click", (e) => {
+    if (e.target === dialog) dialog.close();
+  });
+  return { element: dialog, open: () => dialog.showModal() };
 }
 
 export function mountApp(root: HTMLElement, store: Store): void {
-  const controls = buildControls(store);
+  const sidebar = buildSidebar(store);
+  const stage = buildPreview(store, sidebar.reveal);
+  const drawer = buildDrawer(store);
+
+  const topbar = h("header", { class: "topbar" },
+    h("div", { class: "brand" }, logoMark(30), h("span", { class: "brand-name" }, "Feathers")),
+    h("div", { class: "tool-tabs" },
+      segmentedControl<Tool>(TOOLS, () => store.get().tool, (t) => store.setTool(t), { label: "I'm building for" })),
+    schemaChip(store),
+    themeName(store),
+    h("div", { class: "topbar-actions" },
+      segmentedControl<Mode>(MODES, () => store.get().mode, (m) => store.setMode(m), { label: "Detail level", class: "mode-toggle" }),
+      presetPicker(store),
+      h("button", { type: "button", class: "btn primary download", onclick: drawer.open }, icon("download", 18), "Download")));
+
   root.replaceChildren(
-    h("header", { class: "top" },
-      h("div", { class: "brand" },
-        h("h1", {}, "Feathers"),
-        h("p", {}, "One theme for Power BI and Tableau: colors, fonts, gridlines and backgrounds.")),
-      h("div", { class: "top-controls" }, toolToggle(store), modeToggle(store), presetPicker(store))),
-    h("main", { class: "workspace" },
-      controls.element,
-      h("section", { class: "preview", "aria-labelledby": "preview-title" },
-        h("h2", { id: "preview-title" }, "Preview"),
-        buildPreview(store, controls.reveal),
-        paletteStrips(store),
-        buildA11yPanel(store))),
-    buildExportBar(store),
+    h("div", { class: "app" }, topbar, sidebar.rail, sidebar.panel, stage),
+    drawer.element,
   );
 }

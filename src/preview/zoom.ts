@@ -1,5 +1,5 @@
 /** The sample reports are laid out at this width and scaled to fit the stage. */
-export const DESIGN_WIDTH = 960;
+export const DESIGN_WIDTH = 1100;
 
 export const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5] as const;
 

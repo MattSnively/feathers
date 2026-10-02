@@ -21,309 +21,307 @@ const check = (name, ok, detail = "") => {
   console.log(`${ok ? "PASS" : "FAIL"}  ${name}${ok ? "" : "  -> " + detail}`);
 };
 
-const browser = await chromium.launch({
-  executablePath: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
-});
-const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true });
+const browser = await chromium.launch({ executablePath: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" });
+const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, acceptDownloads: true });
 await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: "http://localhost:4173" });
 const page = await context.newPage();
+page.setDefaultTimeout(8000);
 const consoleErrors = [];
 page.on("console", (m) => m.type() === "error" && consoleErrors.push(m.text()));
 page.on("response", (r) => r.status() >= 400 && consoleErrors.push(`HTTP ${r.status()} ${r.url()}`));
 page.on("pageerror", (e) => consoleErrors.push(String(e)));
 
 await page.goto("http://localhost:4173/");
-const color = (n) => page.getByLabel(`Color ${n}`, { exact: true });
+
+// ---- helpers ------------------------------------------------------------------------------
 const focusKey = () => page.evaluate(() => document.activeElement?.dataset?.key ?? null);
+const tab = (name) => page.locator(`.rail-btn[data-tab="${name}"]`).click();
+const activeTab = () => page.locator('.rail-btn[aria-pressed="true"]').getAttribute("data-tab");
+const chip = (i, kind = "categorical") => page.locator(`[data-key="chip-${kind}-${i}"]`);
+const chipColor = (i, kind = "categorical") => chip(i, kind).evaluate((e) => e.style.getPropertyValue("--c").trim().toUpperCase());
+const hexInput = (key) => page.locator(`input[data-key="${key}"]`);
+const setRange = (loc, v) => loc.evaluate((el, value) => { el.value = String(value); el.dispatchEvent(new Event("input", { bubbles: true })); }, v);
+const range = (label) => page.locator(".panel").getByLabel(label, { exact: true });
+const pressed = (name) => page.getByRole("button", { name, exact: true }).first().getAttribute("aria-pressed");
+const setMode = (m) => page.getByRole("button", { name: m, exact: true }).click();
+const barFill = (n) => page.locator(`svg rect[aria-label="Edit color ${n}"]`).first().getAttribute("fill");
+const panelText = () => page.locator(".panel").innerText();
+const has = async (label) => (await page.locator(".panel").getByLabel(label, { exact: true }).count()) > 0;
+const box = async (sel) => page.locator(sel).first().boundingBox();
+const openDrawer = async () => { await page.locator(".topbar .download").click(); await page.locator("dialog[open]").waitFor(); };
+const closeDrawer = async () => { await page.keyboard.press("Escape"); await page.waitForFunction(() => !document.querySelector("dialog[open]")); };
+const reset = async () => {
+  await page.locator("#preset").selectOption({ label: "Playfair Data brand" });
+  await page.getByRole("button", { name: "Power BI", exact: true }).first().click();
+};
 
-// 0. Beginner is the default, and hides detail controls
-const pressed = (name) => page.getByRole("button", { name, exact: true }).getAttribute("aria-pressed");
-const has = async (label) => (await page.getByLabel(label, { exact: true }).count()) > 0;
-check("defaults to Beginner", (await pressed("Beginner")) === "true" && (await pressed("Advanced")) === "false");
-check("Beginner hides status and text colors", !(await page.getByText("Status colors", { exact: true }).count()) && !(await page.getByText("Text colors", { exact: true }).count()));
-check("Beginner shows one Font control, not Body/Title", (await has("Font")) && !(await has("Body font")) && !(await has("Title font")));
-check("Beginner hides font sizes", !(await has("Body size (pt)")) && !(await has("Card value size (pt)")));
-check("Beginner hides line width and the zero line", !(await has("Width (1-5)")) && !(await page.getByText("Zero line", { exact: true }).count()));
-check("Beginner keeps gridline show/style/color", (await page.getByLabel("Style", { exact: true }).count()) === 1);
-check("Beginner hides View file", (await page.getByRole("button", { name: "View file" }).count()) === 0);
-check("Beginner still offers Download and Copy XML", (await page.getByRole("button", { name: "Download" }).count()) === 3 && (await page.getByRole("button", { name: "Copy XML" }).count()) === 1);
-check("Beginner points to Advanced", (await page.getByText("Switch to Advanced for").count()) === 1);
-check("Beginner Power BI lists canvas and page backgrounds", (await has("Canvas (Power BI)")) && (await has("Page (Power BI)")));
-// preview parts whose controls are hidden are not clickable
-const roleCount = (sel) => page.locator(sel).evaluateAll((els) => els.filter((e) => e.getAttribute("role") === "button").length);
-check("card values aren't clickable in Beginner", (await roleCount(".pv-kpi")) === 0);
-check("palette bars still are", (await roleCount('svg rect[aria-label^="Edit color"]')) > 0);
-await page.locator('.pv-title[aria-label="Edit title font"]').focus();
-await page.keyboard.press("Enter");
-check("Beginner title click lands on the single Font control", (await focusKey()) === "font-body", String(await focusKey()));
-// choosing the single font sets both body and title
-await page.getByLabel("Font", { exact: true }).selectOption("Verdana");
-await page.getByRole("button", { name: "Advanced", exact: true }).click();
-check("Advanced shows Body and Title fonts", (await has("Body font")) && (await has("Title font")));
-check("single Beginner font set both body and title", (await page.getByLabel("Body font", { exact: true }).inputValue()) === "Verdana" && (await page.getByLabel("Title font", { exact: true }).inputValue()) === "Verdana");
-check("Advanced shows the detail controls again", (await page.getByText("Status colors", { exact: true }).count()) === 1 && (await has("Body size (pt)")) && (await has("Width (1-5)")));
-check("Advanced makes card values clickable", (await roleCount(".pv-kpi")) > 0);
-check("Advanced offers View file", (await page.getByRole("button", { name: "View file" }).count()) === 3);
-// switching modes keeps the theme
-await color(1).fill("#123456");
-await page.getByRole("button", { name: "Beginner", exact: true }).click();
-check("mode switch keeps edits", (await color(1).inputValue()) === "#123456");
-// Tableau + Beginner shows only the chart-area background
-await page.getByRole("button", { name: "Tableau", exact: true }).click();
-check("Beginner Tableau hides canvas and page backgrounds", !(await has("Canvas (Power BI)")) && !(await has("Page (Power BI)")) && (await has("Chart area")));
-check("Beginner Tableau zero line isn't clickable", (await page.locator('[aria-label="Edit zero line"]').count()) === 0);
-await page.screenshot({ path: path.join(SHOTS, "beginner-tableau.png"), fullPage: false });
-await page.getByRole("button", { name: "Power BI", exact: true }).click();
-await page.getByLabel("Start from").selectOption({ label: "Playfair Data brand" });
-await page.getByRole("button", { name: "Advanced", exact: true }).click();
-check("ready for the Advanced suite", (await pressed("Advanced")) === "true" && (await color(1).inputValue()) === "#0A3746");
+// =============================================================================================
+// 1. Layout: the app fills the viewport
+// =============================================================================================
+const app = await box(".app");
+const stage = await box(".stage");
+const panel = await box(".panel");
+const frame = await box(".pv-frame");
+check("app fills a 1920px viewport", Math.abs(app.width - 1920) < 2 && Math.abs(app.height - 1080) < 2, JSON.stringify(app));
+check("stage takes the remaining width (>1400px)", stage.width > 1400, `stage ${stage.width}`);
+check("panel is a compact fixed column (300-400px)", panel.width >= 300 && panel.width <= 400, `panel ${panel.width}`);
+check("report fills the stage (>85% of its width)", frame.width > stage.width * 0.85, `frame ${frame.width} / stage ${stage.width}`);
+check("no horizontal page scroll at 1920", (await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0);
+check("page itself doesn't scroll (panel and stage do)", (await page.evaluate(() => document.documentElement.scrollHeight - innerHeight)) <= 1);
+await page.screenshot({ path: path.join(SHOTS, "e2e-1920.png") });
 
-// 1. initial render
-check("renders heading", (await page.locator("h1").textContent()) === "Feathers");
-check("loads Playfair by default", (await color(1).inputValue()) === "#0A3746");
-check("8 categorical rows", (await page.locator(".swatch-row").count()) === 8);
-await page.screenshot({ path: path.join(SHOTS, "desktop-light.png"), fullPage: true });
+// =============================================================================================
+// 2. Defaults and Beginner
+// =============================================================================================
+check("defaults: Beginner, Power BI, Colors tab", (await pressed("Beginner")) === "true" && (await pressed("Power BI")) === "true" && (await activeTab()) === "colors");
+check("8 swatch chips for Playfair", (await page.locator('[data-key^="chip-categorical-"]').count()) === 8);
+check("first swatch selected, its hex shown", (await chip(0).getAttribute("aria-pressed")) === "true" && (await hexInput("cat-0").inputValue()) === "#0A3746");
+check("Beginner hides status/text color sections", !(await panelText()).includes("Status") && !(await panelText()).includes("Primary"));
+check("Beginner points to Advanced", (await panelText()).includes("More settings are in Advanced"));
+await tab("text");
+check("Beginner Text: one Font control, no sizes", (await has("Font")) && !(await has("Font size")));
+await tab("lines");
+check("Beginner Lines: gridlines only, no width/zero line", !(await has("Width")) && !(await panelText()).includes("Zero line"));
+await tab("canvas");
+check("Beginner Canvas (Power BI) lists canvas, page, chart area", (await has("Canvas (Power BI)")) && (await has("Page (Power BI)")) && (await has("Chart area")));
+await tab("colors");
 
-// 1b. guides: present, closed until needed, ordered by selected tool
-const guideTitles = async () => page.locator(".guide > summary").allTextContents();
-check("three guides render", (await page.locator(".guide").count()) === 3);
-check("guides start closed", (await page.locator(".guide[open]").count()) === 0);
-check("Power BI tool lists the Power BI guide first", (await guideTitles())[0] === "Import into Power BI Desktop", (await guideTitles()).join(" | "));
-check("which-files hint for Power BI", (await page.locator(".which-files").textContent()).includes("one file"));
-await page.getByRole("button", { name: "Tableau", exact: true }).click();
-check("Tableau tool lists Tableau guides first", (await guideTitles())[0].includes("Tableau") && (await guideTitles())[1].includes("Tableau"), (await guideTitles()).join(" | "));
-check("which-files hint for Tableau", (await page.locator(".which-files").textContent()).includes("both files"));
-await page.getByRole("button", { name: "Power BI", exact: true }).click();
+// =============================================================================================
+// 3. Color editing: swatches, hex, HSL sliders
+// =============================================================================================
+await chip(2).click();
+check("clicking a swatch selects it", (await chip(2).getAttribute("aria-pressed")) === "true" && (await chip(0).getAttribute("aria-pressed")) === "false");
+check("editor follows the selection (Color 3)", (await hexInput("cat-2").inputValue()) === "#0F542C");
+await hexInput("cat-2").fill("#FF0000");
+check("valid hex updates the swatch", (await chipColor(2)) === "#FF0000");
+check("valid hex redraws the preview bar", (await barFill(3)) === "#FF0000");
+check("typing keeps focus in the hex field", (await focusKey()) === "cat-2");
+check("hex moves the sliders (red = 0deg/100%/50%)", (await range("Hue").inputValue()) === "0" && (await range("Saturation").inputValue()) === "100" && (await range("Lightness").inputValue()) === "50");
+check("sliders show live readouts", (await page.locator(".range-out").first().innerText()) === "0\u00B0");
+await setRange(range("Hue"), 120);
+check("dragging Hue rewrites the hex (green)", (await hexInput("cat-2").inputValue()) === "#00FF00");
+check("...and the swatch and preview", (await chipColor(2)) === "#00FF00" && (await barFill(3)) === "#00FF00");
+await setRange(range("Lightness"), 25);
+check("dragging Lightness darkens the color", (await hexInput("cat-2").inputValue()) === "#008000");
+await range("Saturation").focus();
+await page.keyboard.press("ArrowLeft");
+check("sliders respond to the keyboard", (await range("Saturation").inputValue()) === "99");
+await hexInput("cat-2").fill("#12");
+check("invalid hex is flagged", (await hexInput("cat-2").getAttribute("aria-invalid")) === "true" && (await page.getByText("Use a 6-digit hex color").isVisible()));
+check("...and not committed", (await chipColor(2)) !== "#112222");
+await hexInput("cat-2").blur();
+check("blur restores the last valid hex", /^#[0-9A-F]{6}$/.test(await hexInput("cat-2").inputValue()));
+await hexInput("cat-2").fill("#0F542C");
 
-// 1c. accessibility panel: findings, live updates, simulations
-const a11y = () => page.locator(".a11y").innerText();
-let panel = await a11y();
-check("a11y panel flags Playfair muted text", panel.includes("Muted text is hard to read"));
-check("a11y panel flags the brand's similar blues", panel.includes("color 1 and color 7"));
-check("a11y panel flags red/green status under protanopia", panel.includes("Status colors that look alike with protanopia"));
-check("a11y summary counts findings", /\d+ things? to check/.test(await page.locator(".a11y-summary").innerText()));
-check("simulation strips for 3 vision types", (await page.locator(".a11y .chips").count()) === 3);
-check("simulated chips are labelled for screen readers", (await page.locator('.a11y .chip[aria-label*="deuteranopia"]').count()) === 8);
-check("disclaimer says checks can't certify", panel.includes("can't certify"));
-await color(7).fill("#CC79A7");
-check("findings update live (similar-blues pair resolves)", !(await a11y()).includes("color 1 and color 7"));
-check("editing a color keeps focus (panel isn't a focus trap)", (await focusKey()) === "cat-6");
-await color(7).fill("#03222C");
-check("restoring the color brings the finding back", (await a11y()).includes("color 1 and color 7"));
-await page.getByLabel("Start from").selectOption({ label: "Okabe-Ito (colorblind-safe)" });
-panel = await a11y();
-check("Okabe-Ito shows no color-confusion findings", !panel.includes("look alike"));
-check("Okabe-Ito still reports faint yellow honestly", panel.includes("faint on the chart background") && panel.includes("color 4"));
-await page.screenshot({ path: path.join(SHOTS, "a11y-okabe.png"), fullPage: false });
-await page.getByLabel("Start from").selectOption({ label: "Playfair Data brand" });
-check("switching back restores Playfair findings", (await a11y()).includes("Muted text is hard to read"));
+// reorder: buttons, focus, drag
+await chip(0).click();
+await page.getByRole("button", { name: /Move Color 1 later/ }).click();
+check("move later swaps and keeps the color selected", (await chipColor(1)) === "#0A3746" && (await chip(1).getAttribute("aria-pressed")) === "true");
+check("focus stays on the Move later button", (await focusKey()) === "move-later");
+await chip(1).dragTo(chip(4));
+check("drag-and-drop reorders swatches", (await chipColor(4)) === "#0A3746");
+await reset();
+await page.locator('[data-key="add-color"]').click();
+check("add color -> 9 swatches, new one selected", (await page.locator('[data-key^="chip-categorical-"]').count()) === 9 && (await chip(8).getAttribute("aria-pressed")) === "true");
+await page.getByRole("button", { name: /Remove Color 9/ }).click();
+check("remove color -> 8 swatches", (await page.locator('[data-key^="chip-categorical-"]').count()) === 8);
 
-// 1d. report preview + click-to-edit
-const open = (name) => page.locator("details.panel", { hasText: name }).evaluate((el) => el.open);
-const toggle = (name) => page.locator("details.panel", { hasText: name }).locator("summary").first().click();
-check("Power BI preview renders", (await page.locator(".pv-canvas .pv-page").count()) === 1);
-const editables = await page.locator(".report-preview .editable").count();
-check("preview has many click-to-edit parts", editables > 20, `count ${editables}`);
-check("every editable is an accessible button", await page.locator(".report-preview .editable").evaluateAll((els) => els.every((e) => e.getAttribute("role") === "button" && e.getAttribute("tabindex") === "0" && /^Edit /.test(e.getAttribute("aria-label") ?? ""))));
-check("gridlines exist in the preview (dotted, even if faint)", (await page.locator('[aria-label="Edit gridlines"] line[stroke-dasharray]').count()) > 0);
-
-// click a card -> opens collapsed Backgrounds panel and focuses the chart-area color
-await toggle("Backgrounds");
-check("Backgrounds panel collapsed for the test", !(await open("Backgrounds")));
-await page.locator(".pv-card").first().click({ position: { x: 3, y: 3 } });
-check("clicking a chart area opens its panel", await open("Backgrounds"));
-check("...and focuses the chart-area color", (await focusKey()) === "bg-container", String(await focusKey()));
-check("preview announces where it jumped", (await page.locator(".pv-status").innerText()).includes("chart area background"));
-
-// click a bar while on the Diverging tab -> returns to Categorical and focuses that color
+// sequential / diverging use the same editor
 await page.getByRole("button", { name: "Diverging", exact: true }).click();
-await page.locator('svg rect[aria-label="Edit color 2"]').first().click();
-check("clicking a bar jumps to that data color", (await focusKey()) === "cat-1", String(await focusKey()));
-check("...switching back to the categorical tab", (await color(2).count()) === 1);
+check("diverging has 3 swatches and a ramp strip", (await page.locator('[data-key^="chip-diverging-"]').count()) === 3 && (await page.locator(".ramp").count()) === 1);
+const before = await page.locator(".ramp").evaluate((e) => e.style.background);
+await hexInput("diverging-0").fill("#FF00FF");
+check("editing a ramp end repaints the strip", (await page.locator(".ramp").evaluate((e) => e.style.background)) !== before);
+await page.getByRole("button", { name: "Sequential", exact: true }).click();
+check("sequential has 2 swatches", (await page.locator('[data-key^="chip-sequential-"]').count()) === 2);
+await page.getByRole("button", { name: "Categorical", exact: true }).click();
+await reset();
 
-// keyboard: Enter on gridlines / title
+// =============================================================================================
+// 4. Click-to-edit from the preview
+// =============================================================================================
+check("preview has many click-to-edit parts", (await page.locator(".stage .editable").count()) > 15);
+check("every editable is a labelled button", await page.locator(".stage .editable").evaluateAll((els) => els.every((e) => e.getAttribute("role") === "button" && e.getAttribute("tabindex") === "0" && /^Edit /.test(e.getAttribute("aria-label") ?? ""))));
+await tab("text");
+await page.locator('svg rect[aria-label="Edit color 2"]').first().click();
+check("clicking a bar opens Colors, selects that swatch", (await activeTab()) === "colors" && (await chip(1).getAttribute("aria-pressed")) === "true");
+check("...and focuses its hex field", (await focusKey()) === "cat-1", String(await focusKey()));
+await page.locator(".pv-card").first().click({ position: { x: 3, y: 3 } });
+check("clicking a chart area opens Canvas and focuses it", (await activeTab()) === "canvas" && (await focusKey()) === "bg-container", `${await activeTab()} ${await focusKey()}`);
+check("preview announces where it jumped", (await page.locator(".pv-status").innerText()).includes("chart area background"));
 await page.locator('[aria-label="Edit gridlines"]').focus();
 await page.keyboard.press("Enter");
-check("keyboard Enter on gridlines jumps to gridline color", (await focusKey()) === "gridline-color", String(await focusKey()));
+check("keyboard Enter on gridlines opens Lines", (await activeTab()) === "lines" && (await focusKey()) === "gridline-color");
 await page.locator('.pv-title[aria-label="Edit title font"]').focus();
 await page.keyboard.press("Enter");
-check("keyboard Enter on the title jumps to the title font", (await focusKey()) === "font-title", String(await focusKey()));
+check("Beginner: title click lands on the single Font control", (await activeTab()) === "text" && (await focusKey()) === "font-body", String(await focusKey()));
+check("Beginner: card values aren't clickable", (await page.locator(".pv-kpi").evaluateAll((els) => els.filter((e) => e.getAttribute("role") === "button").length)) === 0);
+await page.getByRole("button", { name: "Edit hints" }).click();
+check("Edit hints outlines clickable parts", (await page.locator(".stage.hints").count()) === 1 && (await pressed("Edit hints")) === "true");
+await page.getByRole("button", { name: "Edit hints" }).click();
 
-// the preview redraws live
-await color(1).fill("#112233");
-check("editing a color redraws the bars", (await page.locator('svg rect[aria-label="Edit color 1"]').first().getAttribute("fill")) === "#112233");
-await page.getByLabel("Title font", { exact: true }).selectOption("Verdana");
-check("title font change reaches the preview", (await page.locator(".pv-title").first().evaluate((e) => getComputedStyle(e).fontFamily)).includes("Verdana"));
-await page.getByLabel("Card value size (pt)").fill("20");
-check("card value size reaches the preview", Math.abs(parseFloat(await page.locator(".pv-kpi").first().evaluate((e) => getComputedStyle(e).fontSize)) - 26.67) < 0.1);
-await page.getByLabel("Canvas (Power BI)", { exact: true }).fill("#102030");
+// zoom
+const z0 = await page.locator(".pv-frame").evaluate((e) => e.style.zoom);
+check("default zoom is Fit (>1 at 1920)", Number(z0) > 1, z0);
+await page.getByLabel("Zoom").selectOption("0.5");
+check("zoom select scales the report", (await page.locator(".pv-frame").evaluate((e) => e.style.zoom)) === "0.5");
+await page.getByLabel("Zoom").selectOption("fit");
+
+// =============================================================================================
+// 5. Advanced: sliders reach the preview
+// =============================================================================================
+await setMode("Advanced");
+check("Advanced is pressed", (await pressed("Advanced")) === "true");
+await tab("text");
+check("Advanced Text: Body/Titles/Card sections with size sliders", (await page.locator('.panel input[type="range"]').count()) === 3);
+check("size sliders show pt readouts", (await page.locator(".range-out").allInnerTexts()).join(",") === "10pt,14pt,40pt");
+await setRange(page.locator('[data-key="size-body"]'), 14);
+const stylePx = async (sel) => parseFloat(/font-size:\s*([\d.]+)px/.exec(await page.locator(sel).first().getAttribute("style"))[1]);
+check("body size slider reaches the preview (14pt = 18.67px)", Math.abs((await stylePx(".pv-table td")) - 18.667) < 0.01);
+await setRange(page.locator('[data-key="size-callout"]'), 20);
+check("card value slider reaches the preview (20pt = 26.67px)", Math.abs((await stylePx(".pv-kpi")) - 26.667) < 0.01);
+await page.locator('[data-key="font-title"]').selectOption("Verdana");
+check("title font reaches the preview", (await page.locator(".pv-title").first().evaluate((e) => getComputedStyle(e).fontFamily)).includes("Verdana"));
+await tab("lines");
+check("Advanced Lines: gridline and zero line sections with width sliders", (await page.locator('.panel input[type="range"]').count()) === 2);
+await setRange(page.locator('[data-key="gridline-width"]'), 4);
+check("width slider reaches the gridlines", (await page.locator('[aria-label="Edit gridlines"] line').first().getAttribute("stroke-width")) === "4");
+await page.locator(".panel").getByRole("button", { name: "Dashed" }).first().click();
+check("style segmented control reaches the preview", (await page.locator('[aria-label="Edit gridlines"] line').first().getAttribute("stroke-dasharray")) === "16 12");
+const showGrid = page.locator(".panel .switch").first();
+await showGrid.uncheck();
+check("switching gridlines off removes them", (await page.locator('[aria-label="Edit gridlines"]').count()) === 0);
+await showGrid.check();
+await tab("canvas");
+await hexInput("bg-canvas").fill("#102030");
 check("canvas color reaches the preview", (await page.locator(".pv-canvas").evaluate((e) => getComputedStyle(e).backgroundColor)) === "rgb(16, 32, 48)");
-const gridCheck = page.locator("details.panel", { hasText: "Lines" }).getByLabel("Show").first();
-await gridCheck.uncheck();
-check("hiding gridlines removes them from the preview", (await page.locator('[aria-label="Edit gridlines"]').count()) === 0);
-await gridCheck.check();
-await page.locator("details.panel", { hasText: "Lines" }).getByLabel("Style").first().selectOption("solid");
-check("solid gridlines draw without a dash array", (await page.locator('[aria-label="Edit gridlines"] line[stroke-dasharray]').count()) === 0);
+await tab("colors");
+check("Advanced Colors adds Status and Text sections", (await panelText()).includes("Status") && (await panelText()).includes("Primary"));
+check("Advanced card values are clickable", (await page.locator(".pv-kpi").evaluateAll((els) => els.filter((e) => e.getAttribute("role") === "button").length)) > 0);
+await page.locator(".pv-kpi").first().click();
+check("clicking a card value opens its size slider", (await activeTab()) === "text" && (await focusKey()) === "size-callout", `${await activeTab()} ${await focusKey()}`);
+await tab("canvas");
+await setMode("Beginner");
+check("switching modes keeps edits", (await page.locator(".pv-canvas").evaluate((e) => getComputedStyle(e).backgroundColor)) === "rgb(16, 32, 48)");
+await reset();
+await setMode("Advanced");
 
-// Tableau preview
+// =============================================================================================
+// 6. Tool toggle
+// =============================================================================================
 await page.getByRole("button", { name: "Tableau", exact: true }).click();
-check("Tableau preview renders", (await page.locator(".pv-tab").count()) === 1);
-check("Tableau preview has a zero line", (await page.locator('[aria-label="Edit zero line"]').count()) >= 1);
+check("Tableau preview renders with a zero line", (await page.locator(".pv-tab").count()) === 1 && (await page.locator('[aria-label="Edit zero line"]').count()) >= 1);
+check("schema chip follows the tool", (await page.locator(".schema-chip").innerText()).includes("Tableau theme"));
+await tab("text");
+check("Tableau fonts list", (await page.locator('[data-key="font-body"] option').allTextContents()).includes("Tableau Book"));
+check("no card-value slider for Tableau", (await page.locator('[data-key="size-callout"]').count()) === 0);
 await page.locator('svg rect[aria-label="Edit color 3"]').first().click();
-check("clicking a Tableau bar jumps to its color", (await focusKey()) === "cat-2", String(await focusKey()));
-await page.locator('.pv-tab .pv-card').first().click({ position: { x: 3, y: 3 } });
-check("Tableau view background jumps to the chart-area color", (await focusKey()) === "bg-container", String(await focusKey()));
-await page.screenshot({ path: path.join(SHOTS, "preview-tableau-edit.png"), fullPage: false });
-await page.getByRole("button", { name: "Power BI", exact: true }).click();
-await page.getByLabel("Start from").selectOption({ label: "Playfair Data brand" });
-check("reset for the remaining checks", (await color(1).inputValue()) === "#0A3746");
+check("clicking a Tableau bar jumps to its color", (await activeTab()) === "colors" && (await focusKey()) === "cat-2");
+await setMode("Beginner");
+await tab("canvas");
+check("Beginner Tableau shows only the chart area background", !(await has("Canvas (Power BI)")) && (await has("Chart area")));
+await setMode("Advanced");
+await reset();
 
-// 2. invalid hex is flagged, not committed, and reverts on blur
-await color(1).fill("#12");
-check("invalid hex sets aria-invalid", (await color(1).getAttribute("aria-invalid")) === "true");
-check("invalid hex shows message", await page.getByText("Use a 6-digit hex color").first().isVisible());
-check("export stays enabled while input invalid", await page.getByRole("button", { name: "Download" }).first().isEnabled());
-await color(1).blur();
-check("blur restores last valid value", (await color(1).inputValue()) === "#0A3746");
+// =============================================================================================
+// 7. Presets, name, checks
+// =============================================================================================
+await tab("checks");
+const badge1 = Number(await page.locator(".rail-badge").innerText());
+const summary1 = await page.locator(".a11y-summary").innerText();
+check("Checks badge matches the findings count", summary1.startsWith(`${badge1} thing`), `${badge1} vs ${summary1}`);
+check("Checks tab lists Playfair's real problems", (await panelText()).includes("Muted text is hard to read") && (await panelText()).includes("look alike"));
+check("simulated palettes for 3 vision types", (await page.locator(".a11y .chips").count()) === 3);
+await page.locator("#preset").selectOption({ label: "Okabe-Ito (colorblind-safe)" });
+check("preset sets the name", (await page.locator("#theme-name").inputValue()).startsWith("Okabe-Ito"));
+check("badge updates for the new preset (1 finding)", (await page.locator(".rail-badge").innerText()) === "1", await page.locator(".rail-badge").innerText());
+check("Okabe-Ito: no color-confusion findings", !(await panelText()).includes("look alike"));
+await tab("colors");
+check("preset loads its swatches", (await chipColor(0)) === "#E69F00");
+await reset();
 
-// 3. valid hex commits and syncs the picker
-await color(1).fill("#112233");
-check("valid hex clears invalid flag", (await color(1).getAttribute("aria-invalid")) === null);
-check("picker syncs to hex", (await page.getByLabel("Color 1, color picker").inputValue()) === "#112233");
-check("typing keeps focus (no rebuild)", (await focusKey()) === "cat-0");
-
-// 4. reorder via button, focus follows
-await color(1).fill("#0A3746");
-await page.getByRole("button", { name: "Move color 1 down" }).click();
-check("move down swaps order", (await color(1).inputValue()) === "#F99A2B" && (await color(2).inputValue()) === "#0A3746");
-check("focus stays on the move-down button", (await focusKey()) === "cat-1-down");
-
-// 5. drag reorder: drag handle of row 1 onto row 3
-const before = await color(1).inputValue();
-await page.locator(".drag-handle").first().dragTo(page.locator(".swatch-row").nth(2));
-check("drag-and-drop reorders", (await color(3).inputValue()) === before, `row3=${await color(3).inputValue()} expected ${before}`);
-
-// 6. add / remove
-await page.getByRole("button", { name: "Add color" }).click();
-check("add color -> 9 rows", (await page.locator(".swatch-row").count()) === 9);
-check("focus lands in the new color", (await focusKey()) === "cat-8");
-await page.getByRole("button", { name: "Remove color 9" }).click();
-check("remove color -> 8 rows", (await page.locator(".swatch-row").count()) === 8);
-
-// 7. sequential / diverging tabs
-await page.getByRole("button", { name: "Diverging", exact: true }).click();
-check("diverging tab shows 3 fields", (await page.getByLabel("Center", { exact: true }).count()) === 1);
-await page.getByRole("button", { name: "Categorical", exact: true }).click();
-
-// 8. tool toggle swaps font list
-await page.getByRole("button", { name: "Tableau", exact: true }).click();
-check("fonts panel retitled for Tableau", await page.getByText("Fonts (Tableau)").isVisible());
-const tabFonts = await page.getByLabel("Body font").locator("option").allTextContents();
-check("Tableau fonts include Tableau Book", tabFonts.includes("Tableau Book") && !tabFonts.includes("Segoe UI"));
-await page.getByRole("button", { name: "Power BI", exact: true }).click();
-const pbiFonts = await page.getByLabel("Body font").locator("option").allTextContents();
-check("Power BI fonts include Segoe (Bold)", pbiFonts.includes("Segoe (Bold)") && pbiFonts.includes("DIN"));
-check("card value size only for Power BI", (await page.getByLabel("Card value size (pt)").count()) === 1);
-
-// 9. number validation
-await page.getByLabel("Width (1-5)").first().fill("9");
-check("line width 9 rejected", (await page.getByLabel("Width (1-5)").first().getAttribute("aria-invalid")) === "true");
-
-// 10. preset swap + naming
-await page.getByLabel("Start from").selectOption({ label: "Okabe-Ito (colorblind-safe)" });
-check("preset loads Okabe-Ito color 1", (await color(1).inputValue()) === "#E69F00");
-check("preset sets theme name", (await page.getByLabel("Name", { exact: true }).inputValue()).startsWith("Okabe-Ito"));
-check("filename follows slug", await page.locator(".filename", { hasText: "okabe-ito-colorblind-safe.powerbi.json" }).isVisible());
-check("tps file is not named Preferences.tps", await page.locator(".filename", { hasText: "feathers-okabe-ito-colorblind-safe.tps" }).isVisible());
-
-await page.getByLabel("Width (1-5)").first().fill("3");
-
-// 11. empty name -> inline export error, downloads disabled
-await page.getByLabel("Name", { exact: true }).fill("");
-check("empty name shows export error", await page.getByText("name must not be empty").first().isVisible());
-check("downloads disabled on error", await page.getByRole("button", { name: "Download" }).first().isDisabled());
-await page.getByLabel("Name", { exact: true }).fill("QA Theme #1");
-check("slug sanitizes punctuation", await page.locator(".filename", { hasText: "qa-theme-1.powerbi.json" }).isVisible());
-
-// 12. real downloads, validated against the published schemas
-const dl = async (cardTitle) => {
-  const card = page.locator(".export-card", { hasText: cardTitle });
+// =============================================================================================
+// 8. Download drawer
+// =============================================================================================
+await page.locator("#theme-name").fill("");
+await openDrawer();
+check("empty name: export error shown in the drawer", (await page.locator("dialog").innerText()).includes("name must not be empty"));
+check("empty name: downloads disabled", await page.locator("dialog .export-card").first().getByRole("button", { name: "Download", exact: true }).isDisabled());
+await closeDrawer();
+await page.locator("#theme-name").fill("QA Theme #1");
+await openDrawer();
+check("drawer opens as a modal sheet on the right", await page.locator("dialog.drawer").evaluate((d) => d.getBoundingClientRect().right >= innerWidth - 1 && d.getBoundingClientRect().width <= 740));
+check("filenames follow the slug", (await page.locator("dialog .filename").allInnerTexts()).join("|") === "qa-theme-1.powerbi.json|qa-theme-1.tableau.json|feathers-qa-theme-1.tps");
+check("Advanced offers View file", (await page.locator("dialog").getByRole("button", { name: "View file" }).count()) === 3);
+const dl = async (title) => {
+  const card = page.locator("dialog .export-card", { hasText: title });
   const [d] = await Promise.all([page.waitForEvent("download"), card.getByRole("button", { name: "Download" }).click()]);
   const file = path.join(OUT, d.suggestedFilename());
   await d.saveAs(file);
   return { name: d.suggestedFilename(), text: fs.readFileSync(file, "utf-8") };
 };
 const pbi = await dl("Power BI theme");
-check("PBI filename", pbi.name === "qa-theme-1.powerbi.json", pbi.name);
 const pbiJson = JSON.parse(pbi.text);
-check("PBI download validates vs schema 2.157", validatePbi(pbiJson) === true, JSON.stringify(validatePbi.errors?.slice(0, 2)));
-check("PBI download carries edited palette", pbiJson.dataColors[0] === "#E69F00" && pbiJson.name === "QA Theme #1");
-const tab = await dl("Tableau theme");
-check("Tableau theme filename", tab.name === "qa-theme-1.tableau.json", tab.name);
-const tabJson = JSON.parse(tab.text);
-check("Tableau download validates vs schema", validateTab(tabJson) === true, JSON.stringify(validateTab.errors?.slice(0, 2)));
-check("Tableau gridline width follows edit (3)", tabJson.styles.gridline["line-width"] === 3);
+check("Power BI file validates vs schema 2.157", validatePbi(pbiJson) === true, JSON.stringify(validatePbi.errors?.slice(0, 2)));
+check("Power BI file carries the UI's settings", pbiJson.name === "QA Theme #1" && pbiJson.dataColors[0] === "#0A3746" && pbiJson.textClasses.title.fontSize === 14);
+const tabl = await dl("Tableau theme");
+const tabJson = JSON.parse(tabl.text);
+check("Tableau theme validates vs its schema", validateTab(tabJson) === true, JSON.stringify(validateTab.errors?.slice(0, 2)));
 const tps = await dl("Tableau palettes");
-check("tps filename", tps.name === "feathers-qa-theme-1.tps", tps.name);
-check("tps has 3 palette types", ["regular", "ordered-sequential", "ordered-diverging"].every((t) => tps.text.includes(`type="${t}"`)));
-check("tps escapes the # nothing odd and uses straight quotes", !/[\u201C\u201D]/.test(tps.text));
-
-// 12b. downloading opens the matching guide with the real filename
-check("download opens the tps guide", await page.locator(".guide", { hasText: "Add the palettes" }).evaluate((el) => el.open));
-const tpsGuide = await page.locator(".guide", { hasText: "Add the palettes" }).innerText();
-check("tps guide names the actual file", tpsGuide.includes("feathers-qa-theme-1.tps"));
-check("tps guide shows literal <preferences> text", tpsGuide.includes("<preferences>") && tpsGuide.includes("</preferences>"));
-check("tps guide mentions backup, restart, Assign Palette", /backup/i.test(tpsGuide) && /restart/i.test(tpsGuide) && tpsGuide.includes("Assign Palette"));
-const themeGuide = await page.locator(".guide", { hasText: "Import into Tableau Desktop" }).innerText();
-check("Tableau theme guide names menu path and file", themeGuide.includes("Format > Import Custom Theme") && themeGuide.includes("qa-theme-1.tableau.json"));
-check("no unreplaced {file} placeholders on the page", !(await page.locator("body").innerText()).includes("{file}"));
-await page.screenshot({ path: path.join(SHOTS, "guides.png"), fullPage: true });
-// open state survives edits (controls change -> export bar re-renders)
-await page.getByLabel("Name", { exact: true }).fill("QA Theme #1");
-check("open guides stay open after an edit", await page.locator(".guide", { hasText: "Add the palettes" }).evaluate((el) => el.open));
-
-// 13. copy XML
-await page.locator(".export-card", { hasText: "Tableau palettes" }).getByRole("button", { name: "Copy XML" }).click();
+check("tps has 3 palette types, straight quotes", ["regular", "ordered-sequential", "ordered-diverging"].every((t) => tps.text.includes(`type="${t}"`)) && !/[\u201C\u201D]/.test(tps.text));
+check("downloading opens the matching guide with the real filename", await page.locator("dialog .guide", { hasText: "Add the palettes" }).evaluate((el) => el.open) && (await page.locator("dialog .guide", { hasText: "Add the palettes" }).innerText()).includes("feathers-qa-theme-1.tps"));
+await page.locator("dialog .export-card", { hasText: "Tableau palettes" }).getByRole("button", { name: "Copy XML" }).click();
 const clip = await page.evaluate(() => navigator.clipboard.readText());
-check("Copy XML puts palette blocks on the clipboard", clip.includes("<color-palette") && !clip.includes("<preferences>"));
-check("status announces the copy", await page.getByText("Copied the palette XML").isVisible());
+check("Copy XML copies just the palette blocks", clip.includes("<color-palette") && !clip.includes("<preferences>"));
+check("no unreplaced {file} placeholders", !(await page.locator("dialog").innerText()).includes("{file}"));
+await page.screenshot({ path: path.join(SHOTS, "e2e-drawer.png") });
+await closeDrawer();
+check("Escape returns focus to the Download button", await page.evaluate(() => document.activeElement?.classList.contains("download")));
+await openDrawer();
+await page.mouse.click(40, 300);
+await page.waitForFunction(() => !document.querySelector("dialog[open]"));
+check("clicking the dimmed backdrop closes the drawer", true);
+await setMode("Beginner");
+await openDrawer();
+check("Beginner hides View file but keeps Download and Copy XML", (await page.locator("dialog").getByRole("button", { name: "View file" }).count()) === 0 && (await page.locator("dialog").getByRole("button", { name: "Copy XML" }).count()) === 1);
+await closeDrawer();
+await setMode("Advanced");
 
-// 14. view file toggle keeps focus
-await page.locator(".export-card", { hasText: "Power BI theme" }).getByRole("button", { name: "View file" }).click();
-check("view file shows code", await page.locator("pre.code").first().isVisible());
-check("view toggle keeps focus", (await focusKey()) === "powerbi-view");
-
-// 15. persistence across reload
+// =============================================================================================
+// 9. Persistence
+// =============================================================================================
 await page.getByRole("button", { name: "Tableau", exact: true }).click();
 await page.reload();
-check("reload restores theme name", (await page.getByLabel("Name", { exact: true }).inputValue()) === "QA Theme #1");
-check("reload restores tool", (await page.getByRole("button", { name: "Tableau", exact: true }).getAttribute("aria-pressed")) === "true");
-check("reload restores Advanced mode", (await pressed("Advanced")) === "true");
-
-// 16. corrupt storage falls back to default
+check("reload restores name, tool and mode", (await page.locator("#theme-name").inputValue()) === "QA Theme #1" && (await pressed("Tableau")) === "true" && (await pressed("Advanced")) === "true");
 await page.evaluate(() => localStorage.setItem("feathers.state.v1", "{broken"));
 await page.reload();
-check("corrupt storage falls back to Playfair", (await color(1).inputValue()) === "#0A3746");
+check("corrupt storage falls back to Playfair/Beginner", (await pressed("Beginner")) === "true" && (await chipColor(0)) === "#0A3746");
 
-// 17. phone layout + dark mode
-await page.setViewportSize({ width: 375, height: 800 });
+// =============================================================================================
+// 10. Other viewport sizes and dark mode
+// =============================================================================================
+for (const [w, h] of [[1440, 900], [1280, 720]]) {
+  await page.setViewportSize({ width: w, height: h });
+  await page.waitForTimeout(300); // let the stage's ResizeObserver refit the report
+  const s = await box(".stage");
+  const f = await box(".pv-frame");
+  check(`${w}px: fills the viewport, report fits the stage`, Math.abs((await box(".app")).width - w) < 2 && f.width <= s.width && (await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0, `stage ${s.width} frame ${f.width}`);
+}
+await page.setViewportSize({ width: 768, height: 1024 });
+check("768px: stacked layout, no horizontal scroll", (await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0);
+await page.setViewportSize({ width: 375, height: 812 });
 await page.reload();
-const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-check("no horizontal scroll at 375px", overflow <= 0, `overflow ${overflow}px`);
-await page.screenshot({ path: path.join(SHOTS, "phone-light.png"), fullPage: true });
+check("375px: no horizontal scroll", (await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0, String(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)));
+const dlBtn = await box(".topbar .download");
+check("375px: Download is on the first row of the top bar", dlBtn.y < 70, `y=${dlBtn.y}`);
+check("375px: report reflows to the screen width", (await box(".pv-frame")).width <= 375);
+await page.screenshot({ path: path.join(SHOTS, "e2e-375.png"), fullPage: false });
+await page.setViewportSize({ width: 1920, height: 1080 });
 await page.emulateMedia({ colorScheme: "dark" });
-await page.setViewportSize({ width: 1280, height: 900 });
-await page.waitForTimeout(600);
-const dark = await page.evaluate(() => {
-  const css = (sel) => getComputedStyle(document.querySelector(sel));
-  return { input: css("input[type=text]").backgroundColor, inputText: css("input[type=text]").color,
-           btn: css("button.secondary").backgroundColor, body: css("body").backgroundColor };
-});
-console.log("dark computed:", JSON.stringify(dark));
-check("dark inputs use the dark surface", dark.input === "rgb(32, 25, 20)", dark.input);
-check("dark input text is light", dark.inputText === "rgb(243, 244, 239)", dark.inputText);
-check("dark buttons use the dark surface", dark.btn === "rgb(32, 25, 20)", dark.btn);
-await page.screenshot({ path: path.join(SHOTS, "desktop-dark.png"), fullPage: true });
+await page.waitForTimeout(400);
+const dark = await page.evaluate(() => ({ body: getComputedStyle(document.body).backgroundColor, panel: getComputedStyle(document.querySelector(".panel")).backgroundColor, text: getComputedStyle(document.body).color }));
+check("dark mode: dark surfaces, light text", dark.body === "rgb(20, 23, 29)" && dark.panel === "rgb(20, 23, 29)" && dark.text === "rgb(238, 240, 244)", JSON.stringify(dark));
+await page.screenshot({ path: path.join(SHOTS, "e2e-dark.png") });
 
 check("no console errors", consoleErrors.length === 0, consoleErrors.join(" | "));
 

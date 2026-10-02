@@ -1,5 +1,7 @@
+import { DESIGN_WIDTH, fitZoom, ZOOM_STEPS } from "../../preview/zoom";
 import type { Store } from "../../state/store";
 import { h } from "../dom";
+import { icon } from "../icons";
 import { isAvailable, resolveKey } from "../visibility";
 import type { Edit } from "./chart";
 import { powerBiPreview } from "./powerbi";
@@ -11,14 +13,25 @@ const CAPTION: Record<"powerbi" | "tableau", string> = {
     "An approximation of a Tableau dashboard. Marks use your full palette as if assigned with Edit Colors; the theme file itself only sets one mark color. Tableau's own fonts show as a stand-in unless Tableau is installed.",
 };
 
-/** Sample report that redraws with every change; every themed part jumps to its control when clicked. */
+const STAGE_PADDING = 32;
+const WIDE = "(min-width: 900px)";
+
+/**
+ * The stage: a sample report that redraws with every change and scales to fill the available width.
+ * Every themed part jumps to its control when clicked.
+ */
 export function buildPreview(store: Store, reveal: (key: string) => void): HTMLElement {
-  const root = h("div", { class: "report-preview" });
-  // Persistent live region so jumping to a control is announced even though the preview redraws.
+  const frame = h("div", { class: "pv-frame" });
+  // Persistent live region so jumping to a control is announced even though the report redraws.
   const status = h("p", { class: "pv-status", role: "status" });
+  const caption = h("p", { class: "hint pv-caption" });
+  const scroller = h("div", { class: "stage-scroll" }, frame, caption, status);
+  const root = h("main", { class: "stage", id: "preview", "aria-label": "Preview" });
+
+  let zoomChoice: "fit" | number = "fit";
 
   const edit: Edit = (el, requested, label) => {
-    // Read at call time (the preview redraws on every change), so this always reflects the current mode.
+    // Read at call time (the report redraws on every change), so this always reflects the current mode.
     const { mode, tool } = store.get();
     const key = resolveKey(requested, mode);
     // Parts whose control is hidden in this mode stay plain, so Beginner never jumps to something it hides.
@@ -52,20 +65,58 @@ export function buildPreview(store: Store, reveal: (key: string) => void): HTMLE
     return el;
   };
 
-  const render = () => {
-    const { theme, tool, mode } = store.get();
-    root.replaceChildren(
-      h("h3", {}, tool === "powerbi" ? "Power BI preview" : "Tableau preview"),
-      h("p", { class: "hint" }, mode === "beginner"
-        ? "Click a part, or tab to it and press Enter, to jump to its setting. Switch to Advanced to edit more parts."
-        : "Click any part, or tab to it and press Enter, to jump to its setting."),
-      tool === "powerbi" ? powerBiPreview(theme, edit) : tableauPreview(theme, edit),
-      h("p", { class: "hint" }, CAPTION[tool]),
-      status,
-    );
-  };
+  // ---- Toolbar --------------------------------------------------------------------------------
 
+  const zoomSelect = h("select", {
+    class: "select compact",
+    "aria-label": "Zoom",
+    onchange: () => {
+      zoomChoice = zoomSelect.value === "fit" ? "fit" : Number(zoomSelect.value);
+      applyZoom();
+    },
+  },
+    h("option", { value: "fit" }, "Fit"),
+    ...ZOOM_STEPS.map((z) => h("option", { value: String(z) }, `${Math.round(z * 100)}%`)));
+
+  const hintsBtn = h("button", {
+    type: "button",
+    class: "btn ghost",
+    "aria-pressed": "false",
+    title: "Outline every part you can click",
+    onclick: () => {
+      const on = !root.classList.contains("hints");
+      root.classList.toggle("hints", on);
+      hintsBtn.setAttribute("aria-pressed", String(on));
+    },
+  }, icon("pencil", 16), "Edit hints");
+
+  const toolbar = h("div", { class: "stage-toolbar" }, zoomSelect, hintsBtn);
+
+  /** Scales the report to the stage on wide screens; on narrow ones it reflows at full width instead. */
+  function applyZoom() {
+    const wide = window.matchMedia(WIDE).matches;
+    frame.classList.toggle("fixed", wide);
+    if (!wide) {
+      frame.style.removeProperty("zoom");
+      (zoomSelect.options[0] as HTMLOptionElement).textContent = "Fit";
+      return;
+    }
+    const fit = fitZoom(scroller.clientWidth - 2 * STAGE_PADDING, DESIGN_WIDTH);
+    const z = zoomChoice === "fit" ? fit : zoomChoice;
+    frame.style.setProperty("zoom", String(z));
+    (zoomSelect.options[0] as HTMLOptionElement).textContent = `Fit (${Math.round(fit * 100)}%)`;
+  }
+
+  function render() {
+    const { theme, tool } = store.get();
+    frame.replaceChildren(tool === "powerbi" ? powerBiPreview(theme, edit) : tableauPreview(theme, edit));
+    caption.textContent = CAPTION[tool];
+  }
+
+  root.append(h("h2", { class: "visually-hidden" }, "Preview"), toolbar, scroller);
   store.subscribe(render);
   render();
+  new ResizeObserver(applyZoom).observe(scroller);
+  applyZoom();
   return root;
 }

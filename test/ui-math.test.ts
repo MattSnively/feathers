@@ -42,7 +42,7 @@ describe("hsl conversion", () => {
 
 describe("fitZoom", () => {
   it("is 1 at the design width", () => expect(fitZoom(DESIGN_WIDTH)).toBe(1));
-  it("scales proportionally inside the range", () => expect(fitZoom(1440)).toBeCloseTo(1.5, 6));
+  it("scales proportionally inside the range", () => expect(fitZoom(DESIGN_WIDTH * 1.5)).toBeCloseTo(1.5, 6));
   it("clamps for very wide and very narrow stages", () => {
     expect(fitZoom(4000)).toBe(1.75);
     expect(fitZoom(200)).toBe(0.5);
