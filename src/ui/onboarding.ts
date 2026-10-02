@@ -1,0 +1,336 @@
+import { contrastRatio } from "../a11y/color";
+import { EXPORTS, slugify } from "../export/files";
+import { POWER_BI_FONTS, TABLEAU_FONTS } from "../model/fonts";
+import { parseHexList } from "../model/hexlist";
+import { importPowerBiTheme } from "../model/importPowerBi";
+import { deriveRamps } from "../model/ramps";
+import type { Theme } from "../model/theme";
+import { fontStyle } from "../preview/style";
+import { DESIGN_WIDTH } from "../preview/zoom";
+import { blank } from "../presets/blank";
+import { okabeIto, playfair, tolMuted } from "../presets";
+import { h } from "./dom";
+import { icon, logoMark } from "./icons";
+import type { Edit } from "./preview/chart";
+import { powerBiPreview } from "./preview/powerbi";
+import { tableauPreview } from "./preview/tableau";
+
+const PALETTES = [
+  { id: "playfair", title: "Playfair Data", blurb: "Kingfisher blue with an orange feather accent, from the Playfair Data brand.", theme: playfair },
+  { id: "okabe", title: "Okabe-Ito", blurb: "Eight colors designed to stay distinct for color-blind viewers.", theme: okabeIto },
+  { id: "tol", title: "Paul Tol Muted", blurb: "Nine soft, balanced colors that are also color-blind safe.", theme: tolMuted },
+  { id: "starter", title: "Starter", blurb: "Four clean colors to build your own palette from.", theme: blank },
+] as const;
+
+const STEPS = ["Colors", "Fonts", "Start"] as const;
+
+const HEADINGS: [string, string][] = [
+  ["Start with your colors", "Bring your brand's own colors, or start from a palette. You can change any color later."],
+  ["Pick a font", "Only fonts that ship with each tool, so what you see is what imports. You can change them later."],
+  ["Name your theme", "This names your downloaded files. You can rename it any time."],
+];
+
+const sameColors = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((c, i) => c === b[i]);
+
+/** Which palette card (if any) a theme's colors came from, so reopening the flow selects the right one. */
+function sourceOf(theme: Theme): string {
+  return PALETTES.find((p) => sameColors(p.theme.palette.categorical, theme.palette.categorical))?.id ?? "own";
+}
+
+/** Takes a palette's colors and chrome but leaves fonts, sizes and the name alone. */
+function applyPalette(draft: Theme, preset: Theme) {
+  const p = structuredClone(preset);
+  draft.palette = p.palette;
+  draft.status = p.status;
+  draft.text = p.text;
+  draft.background = p.background;
+  draft.gridline = p.gridline;
+  draft.zeroline = p.zeroline;
+}
+
+const noEdit: Edit = (el) => el;
+
+export interface OnboardingHandlers {
+  onFinish: (theme: Theme) => void;
+  onSkip: () => void;
+}
+
+/**
+ * The first-run flow: Colors, Fonts, Start. Works on a private draft of the theme and hands it back
+ * only when the user launches the editor, so skipping never changes anything.
+ */
+export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): { element: HTMLElement; focusStart: () => void } {
+  const draft: Theme = structuredClone(initial);
+  let source = sourceOf(initial);
+  let step = 0;
+  // Where the name came from decides whether a palette choice may rename the theme: only typed names are sticky.
+  let nameSource: "default" | "import" | "typed" = "default";
+
+  // ---- Live preview ---------------------------------------------------------------------------
+
+  const powerFrame = h("div", { class: "ob-pv-frame" });
+  const tableauFrame = h("div", { class: "ob-pv-frame" });
+  const block = (name: string, file: string, frame: HTMLElement) => {
+    const clip = h("div", { class: "ob-pv-clip" }, frame);
+    // The report is laid out at a fixed design width and scaled to whatever column it lands in.
+    new ResizeObserver(() => {
+      if (clip.clientWidth > 0) frame.style.setProperty("zoom", String(clip.clientWidth / DESIGN_WIDTH));
+    }).observe(clip);
+    return h("section", { class: "ob-pv" }, h("div", { class: "ob-pv-head" }, h("strong", {}, name), h("code", {}, file)), clip);
+  };
+  const previewPane = h("aside", { class: "ob-preview", "aria-hidden": "true" },
+    block("Power BI", "theme.json", powerFrame),
+    block("Tableau", ".tps + theme.json", tableauFrame));
+
+  function renderPreview() {
+    powerFrame.replaceChildren(powerBiPreview(draft, noEdit));
+    tableauFrame.replaceChildren(tableauPreview(draft, noEdit));
+  }
+  let queued = false;
+  const schedulePreview = () => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => {
+      queued = false;
+      renderPreview();
+    });
+  };
+
+  // ---- Step 1: colors -------------------------------------------------------------------------
+
+  function colorsStep(): HTMLElement[] {
+    const feedback = h("div", { class: "ob-feedback", role: "status" });
+    const say = (kind: "info" | "error", ...lines: string[]) => {
+      feedback.className = `ob-feedback${kind === "error" ? " error" : ""}`;
+      feedback.replaceChildren(...lines.map((l) => h("p", {}, l)));
+    };
+
+    const tilesHost = h("div", { class: "ob-tiles" });
+    const own = h("section", { class: "ob-card ob-own", "aria-labelledby": "ob-own-title" });
+    const palettes = h("div", { class: "ob-palettes" });
+
+    const check = () => h("span", { class: "ob-check", "aria-hidden": "true" }, icon("check", 16));
+
+    function syncSelection() {
+      own.classList.toggle("is-selected", source === "own");
+      palettes.querySelectorAll<HTMLButtonElement>("[data-palette]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.palette === source)));
+    }
+    const setOwn = () => {
+      source = "own";
+      syncSelection();
+      schedulePreview();
+    };
+    const reramp = () => {
+      const r = deriveRamps(draft.palette.categorical);
+      draft.palette.sequential = r.sequential;
+      draft.palette.diverging = r.diverging;
+    };
+
+    function renderTiles() {
+      tilesHost.replaceChildren(...draft.palette.categorical.map((hex, i) => {
+        const num = h("span", { class: "ob-tile-n" }, String(i + 1));
+        const code = h("span", { class: "ob-tile-hex" }, hex);
+        const input = h("input", { type: "color", value: hex.toLowerCase(), "aria-label": `Color ${i + 1}, ${hex}. Change` });
+        const tile = h("label", { class: "ob-tile" }, num, code, input);
+        const paint = (value: string) => {
+          tile.style.setProperty("--c", value);
+          tile.style.setProperty("--fg", contrastRatio(value, "#FFFFFF") >= 3 ? "#FFFFFF" : "#0F1218");
+          code.textContent = value;
+          input.setAttribute("aria-label", `Color ${i + 1}, ${value}. Change`);
+        };
+        paint(hex);
+        input.addEventListener("input", () => {
+          const value = input.value.toUpperCase();
+          draft.palette.categorical[i] = value;
+          reramp();
+          paint(value);
+          setOwn();
+        });
+        return tile;
+      }));
+    }
+
+    const paste = h("input", {
+      type: "text",
+      class: "ob-paste",
+      placeholder: "Paste hex codes, like #0045E5 #FFB81C #FF5C39",
+      "aria-label": "Paste hex codes",
+      autocomplete: "off",
+      spellcheck: false,
+      oninput: () => {
+        if (paste.value.trim() === "") return say("info");
+        const { colors, ignored } = parseHexList(paste.value);
+        if (colors.length === 0) return say("error", "No hex colors found. Try something like #0045E5.");
+        draft.palette.categorical = colors;
+        reramp();
+        renderTiles();
+        setOwn();
+        say("info", `Using ${colors.length} color${colors.length === 1 ? "" : "s"}.${ignored.length ? ` Skipped: ${ignored.slice(0, 4).join(", ")}${ignored.length > 4 ? "…" : ""}.` : ""}`);
+      },
+    });
+
+    const file = h("input", {
+      type: "file",
+      accept: ".json,application/json",
+      class: "visually-hidden",
+      tabIndex: -1,
+      "aria-label": "Power BI theme file",
+      onchange: async () => {
+        const f = file.files?.[0];
+        if (!f) return;
+        const result = importPowerBiTheme(await f.text(), draft);
+        file.value = "";
+        if (!result.ok) return say("error", result.error);
+        Object.assign(draft, structuredClone(result.theme));
+        nameSource = "import";
+        paste.value = "";
+        renderTiles();
+        setOwn();
+        say("info", `Imported "${result.theme.name}": ${result.applied.join(", ")}.`, ...result.notes);
+      },
+    });
+    const importBtn = h("button", { type: "button", class: "btn big", onclick: () => file.click() }, icon("upload", 18), "Import a Power BI theme");
+
+    own.append(
+      h("div", { class: "ob-card-head" }, h("h2", { id: "ob-own-title" }, "Your own colors"), check()),
+      h("p", { class: "ob-card-text" }, "Click a color to change it, paste your hex codes, or take them from a Power BI theme."),
+      tilesHost,
+      h("div", { class: "ob-paste-row" }, paste, importBtn, file),
+      feedback,
+    );
+
+    palettes.append(...PALETTES.map((p) =>
+      h("button", {
+        type: "button",
+        class: "ob-card ob-palette",
+        "data-palette": p.id,
+        "aria-pressed": String(source === p.id),
+        onclick: () => {
+          applyPalette(draft, p.theme);
+          source = p.id;
+          if (nameSource === "import") nameSource = "default";
+          paste.value = "";
+          say("info");
+          renderTiles();
+          syncSelection();
+          schedulePreview();
+        },
+      },
+      h("div", { class: "ob-strip", "aria-hidden": "true" }, ...p.theme.palette.categorical.map((c) => h("span", { style: `background:${c}` }))),
+      h("div", { class: "ob-card-foot" }, h("div", {}, h("strong", {}, p.title), h("p", {}, p.blurb)), check()))));
+
+    renderTiles();
+    syncSelection();
+    return [own, h("h2", { class: "ob-sub" }, "Or start from a palette"), palettes];
+  }
+
+  // ---- Step 2: fonts --------------------------------------------------------------------------
+
+  function fontsStep(): HTMLElement[] {
+    const group = (title: string, tool: "powerBi" | "tableau", list: readonly string[]) => {
+      const buttons = list.map((name) => {
+        const st = fontStyle(name);
+        const b = h("button", {
+          type: "button",
+          class: "ob-font",
+          "aria-pressed": String(draft.fonts[tool].body === name),
+          style: `font-family:${st.family};font-weight:${st.weight}`,
+          onclick: () => {
+            draft.fonts[tool].body = name;
+            draft.fonts[tool].title = name;
+            buttons.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+            schedulePreview();
+          },
+        }, h("span", { class: "ob-font-aa" }, "Aa"), h("span", { class: "ob-font-name" }, name));
+        return b;
+      });
+      return h("section", {}, h("h2", { class: "ob-sub" }, title), h("div", { class: "ob-fonts" }, ...buttons));
+    };
+    return [
+      group("Power BI font", "powerBi", POWER_BI_FONTS),
+      group("Tableau font", "tableau", TABLEAU_FONTS),
+      h("p", { class: "ob-note" }, "Fonts show as installed on your computer. Tableau's own fonts appear as a stand-in unless Tableau is installed."),
+    ];
+  }
+
+  // ---- Step 3: name and launch ----------------------------------------------------------------
+
+  function startStep(): HTMLElement[] {
+    if (nameSource === "default") draft.name = source === "own" ? "My theme" : PALETTES.find((p) => p.id === source)!.title;
+    const files = h("div", { class: "ob-files" });
+    const renderFiles = () => {
+      const slug = slugify(draft.name);
+      files.replaceChildren(...EXPORTS.map((spec) => h("div", {}, h("span", {}, spec.label), h("code", {}, spec.filename(slug)))));
+    };
+    const name = h("input", {
+      id: "ob-name",
+      type: "text",
+      class: "ob-name",
+      maxLength: 60,
+      value: draft.name,
+      placeholder: "Untitled theme",
+      "aria-label": "Theme name",
+      oninput: () => {
+        nameSource = "typed";
+        draft.name = name.value;
+        renderFiles();
+      },
+      onkeydown: (e: KeyboardEvent) => {
+        if (e.key === "Enter") finish();
+      },
+    });
+    renderFiles();
+    const n = draft.palette.categorical.length;
+    return [
+      name,
+      h("p", { class: "ob-note" }, `${n} color${n === 1 ? "" : "s"} · ${draft.fonts.powerBi.body} in Power BI · ${draft.fonts.tableau.body} in Tableau`),
+      h("h2", { class: "ob-sub" }, "You'll get these files"),
+      files,
+    ];
+  }
+
+  function finish() {
+    if (draft.name.trim() === "") draft.name = "Untitled theme";
+    handlers.onFinish(draft);
+  }
+
+  // ---- Shell ----------------------------------------------------------------------------------
+
+  const main = h("main", { class: "ob-main" });
+  const pills = STEPS.map((label, i) =>
+    h("button", { type: "button", class: "ob-step", onclick: () => go(i) }, h("span", {}, String(i + 1)), label));
+
+  function go(next: number) {
+    step = next;
+    const [title, lead] = HEADINGS[step]!;
+    const heading = h("h1", { tabIndex: -1 }, title);
+    const body = step === 0 ? colorsStep() : step === 1 ? fontsStep() : startStep();
+    const last = step === STEPS.length - 1;
+    main.replaceChildren(
+      heading,
+      h("p", { class: "ob-lead" }, lead),
+      ...body,
+      h("div", { class: "ob-footer" },
+        step > 0 ? h("button", { type: "button", class: "btn big", onclick: () => go(step - 1) }, "Back") : null,
+        last
+          ? h("button", { type: "button", class: "btn primary big", onclick: finish }, "Open the editor")
+          : h("button", { type: "button", class: "btn primary big", onclick: () => go(step + 1) }, "Continue")),
+    );
+    pills.forEach((p, i) => (i === step ? p.setAttribute("aria-current", "step") : p.removeAttribute("aria-current")));
+    heading.focus({ preventScroll: true });
+    renderPreview();
+    document.querySelector(".onboard")?.scrollTo({ top: 0 });
+  }
+
+  const element = h("div", { class: "onboard", role: "region", "aria-label": "Get started" },
+    h("header", { class: "ob-head" },
+      h("div", { class: "brand" }, logoMark(30), h("span", { class: "brand-name" }, "Feathers")),
+      h("nav", { class: "ob-steps", "aria-label": "Steps" }, ...pills),
+      h("button", { type: "button", class: "ob-skip", onclick: handlers.onSkip }, "Skip for now")),
+    h("div", { class: "ob-body" }, main, previewPane));
+
+  return {
+    element,
+    focusStart: () => go(0),
+  };
+}

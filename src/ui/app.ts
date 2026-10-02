@@ -1,12 +1,14 @@
 import type { Theme } from "../model/theme";
 import { blank } from "../presets/blank";
 import { okabeIto, playfair, tolMuted } from "../presets";
+import { markOnboarded } from "../state/onboarding";
 import type { Mode, Store, Tool } from "../state/store";
 import { buildSidebar } from "./controls";
 import { h } from "./dom";
 import { buildExportBar } from "./exportBar";
 import { segmentedControl } from "./fields";
 import { icon, logoMark } from "./icons";
+import { buildOnboarding } from "./onboarding";
 import { buildPreview } from "./preview";
 
 const STARTING_POINTS: [string, Theme][] = [
@@ -87,10 +89,11 @@ function buildDrawer(store: Store) {
   return { element: dialog, open: () => dialog.showModal() };
 }
 
-export function mountApp(root: HTMLElement, store: Store): void {
+export function mountApp(root: HTMLElement, store: Store, opts: { showOnboarding?: boolean } = {}): void {
   const sidebar = buildSidebar(store);
   const stage = buildPreview(store, sidebar.reveal);
   const drawer = buildDrawer(store);
+  let overlay: HTMLElement | null = null;
 
   const topbar = h("header", { class: "topbar" },
     h("div", { class: "brand" }, logoMark(30), h("span", { class: "brand-name" }, "Feathers")),
@@ -101,10 +104,36 @@ export function mountApp(root: HTMLElement, store: Store): void {
     h("div", { class: "topbar-actions" },
       segmentedControl<Mode>(MODES, () => store.get().mode, (m) => store.setMode(m), { label: "Detail level", class: "mode-toggle" }),
       presetPicker(store),
+      h("button", { type: "button", class: "btn ghost new-theme", onclick: () => launchOnboarding() }, icon("plus", 18), "New theme"),
       h("button", { type: "button", class: "btn primary download", onclick: drawer.open }, icon("download", 18), "Download")));
 
-  root.replaceChildren(
-    h("div", { class: "app" }, topbar, sidebar.rail, sidebar.panel, stage),
-    drawer.element,
-  );
+  const app = h("div", { class: "app" }, topbar, sidebar.rail, sidebar.panel, stage);
+  root.replaceChildren(app, drawer.element);
+
+  /** The first-run flow. Everything behind it goes inert so keyboard focus can't wander into the editor. */
+  function launchOnboarding() {
+    if (overlay) return;
+    const close = () => {
+      markOnboarded();
+      overlay?.remove();
+      overlay = null;
+      app.inert = false;
+      drawer.element.inert = false;
+      sidebar.rail.querySelector<HTMLElement>(".rail-btn")?.focus();
+    };
+    const flow = buildOnboarding(store.get().theme, {
+      onFinish: (theme) => {
+        store.loadTheme(theme);
+        close();
+      },
+      onSkip: close,
+    });
+    overlay = flow.element;
+    root.append(overlay);
+    app.inert = true;
+    drawer.element.inert = true;
+    flow.focusStart();
+  }
+
+  if (opts.showOnboarding) launchOnboarding();
 }

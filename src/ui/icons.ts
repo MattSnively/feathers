@@ -17,6 +17,8 @@ const PATHS = {
   right: ["M9 6l6 6-6 6"],
   pencil: ["M4 20h4L19 9l-4-4L4 16v4z"],
   grip: ["M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01"],
+  check: ["M5 12.5l4.5 4.5L19 7.5"],
+  upload: ["M12 16V4", "M7.5 8.5L12 4l4.5 4.5", "M5 20h14"],
 } as const;
 
 export type IconName = keyof typeof PATHS;

@@ -24,6 +24,8 @@ const check = (name, ok, detail = "") => {
 const browser = await chromium.launch({ executablePath: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" });
 const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, acceptDownloads: true });
 await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: "http://localhost:4173" });
+// The editor suite starts past the first-run flow, which has its own suite (onboarding.mjs).
+await context.addInitScript(() => { try { localStorage.setItem("feathers.onboarded.v1", "1"); } catch {} });
 const page = await context.newPage();
 page.setDefaultTimeout(8000);
 const consoleErrors = [];

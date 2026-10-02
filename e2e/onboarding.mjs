@@ -1,0 +1,202 @@
+import { chromium } from "playwright-core";
+import fs from "node:fs";
+import path from "node:path";
+
+const REPO = "C:/Users/matts/projects/feathers";
+const OUT = path.dirname(new URL(import.meta.url).pathname.replace(/^\//, ""));
+const SHOTS = path.join(OUT, "shots");
+fs.mkdirSync(SHOTS, { recursive: true });
+
+const results = [];
+const check = (name, ok, detail = "") => {
+  results.push({ name, ok });
+  console.log(`${ok ? "PASS" : "FAIL"}  ${name}${ok ? "" : "  -> " + detail}`);
+};
+
+const browser = await chromium.launch({ executablePath: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" });
+const errors = [];
+const watch = (page) => {
+  page.setDefaultTimeout(8000);
+  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+  page.on("response", (r) => r.status() >= 400 && errors.push(`HTTP ${r.status()} ${r.url()}`));
+  page.on("pageerror", (e) => errors.push(String(e)));
+};
+
+const fresh = async (viewport = { width: 1920, height: 1080 }) => {
+  const context = await browser.newContext({ viewport });
+  const page = await context.newPage();
+  watch(page);
+  await page.goto("http://localhost:4173/");
+  await page.locator(".onboard").waitFor();
+  return { context, page };
+};
+
+// =============================================================================================
+// A. First visit
+// =============================================================================================
+let { context, page } = await fresh();
+const ob = page.locator(".onboard");
+const h1 = () => page.locator(".onboard h1").innerText();
+const tiles = () => page.locator(".ob-tile");
+const tileHex = () => page.locator(".ob-tile-hex").allInnerTexts();
+const palettePressed = (id) => page.locator(`[data-palette="${id}"]`).getAttribute("aria-pressed");
+const previewFill = () => page.locator(".ob-pv-frame svg rect").first().getAttribute("fill");
+const feedback = () => page.locator(".ob-feedback").innerText();
+const activeTag = () => page.evaluate(() => document.activeElement?.tagName);
+const nextBtn = () => page.getByRole("button", { name: "Continue" });
+
+check("first visit shows the flow", await ob.isVisible());
+check("heading is 'Start with your colors' and has focus", (await h1()) === "Start with your colors" && (await activeTag()) === "H1");
+check("three steps, first is current", (await page.locator(".ob-step").count()) === 3 && (await page.locator('.ob-step[aria-current="step"]').innerText()).includes("Colors"));
+check("the editor behind the flow is inert", await page.locator(".app").evaluate((e) => e.inert === true));
+check("Playfair is preselected, own colors is not", (await palettePressed("playfair")) === "true" && !(await page.locator(".ob-own.is-selected").count()));
+check("8 color tiles from the preselected palette", (await tiles().count()) === 8 && (await tileHex())[0] === "#0A3746");
+check("live preview shows both tools", (await page.locator(".ob-pv").count()) === 2 && (await page.locator(".ob-pv-head code").allInnerTexts()).join("|") === "theme.json|.tps + theme.json");
+check("preview uses the palette", (await previewFill()) === "#0A3746");
+check("preview is decorative (hidden from assistive tech)", (await page.locator(".ob-preview").getAttribute("aria-hidden")) === "true");
+check("both previews fit in view at 1920x1080", await page.locator(".ob-preview").evaluate((e) => e.getBoundingClientRect().bottom <= innerHeight), String(await page.locator(".ob-preview").evaluate((e) => e.getBoundingClientRect().bottom)));
+await page.screenshot({ path: path.join(SHOTS, "ob-1.png") });
+
+// keyboard stays inside the flow
+let escaped = false;
+for (let i = 0; i < 40; i++) {
+  await page.keyboard.press("Tab");
+  // Tabbing past the last control hands focus to the browser's own UI (body); what must never happen is landing in the editor.
+  if (await page.evaluate(() => !!document.activeElement?.closest(".app, dialog"))) escaped = true;
+}
+check("Tab never leaves the flow for the inert editor", !escaped);
+
+// palette cards
+await page.locator('[data-palette="okabe"]').click();
+check("choosing Okabe-Ito selects its card and loads its colors", (await palettePressed("okabe")) === "true" && (await palettePressed("playfair")) === "false" && (await tileHex())[0] === "#E69F00");
+check("...and the preview follows", (await previewFill()) === "#E69F00" || (await page.waitForFunction(() => document.querySelector(".ob-pv-frame svg rect")?.getAttribute("fill") === "#E69F00").then(() => true)));
+
+// edit a tile
+await tiles().nth(1).locator("input").evaluate((el) => { el.value = "#112233"; el.dispatchEvent(new Event("input", { bubbles: true })); });
+check("editing a tile switches to 'Your own colors'", await page.locator(".ob-own.is-selected").count() === 1 && (await palettePressed("okabe")) === "false");
+check("...and updates the tile's hex", (await tileHex())[1] === "#112233");
+
+// paste
+await page.getByLabel("Paste hex codes").fill("#112233 #445566, 778899 nope");
+check("pasting hex codes replaces the tiles", (await tiles().count()) === 3 && (await tileHex()).join(",") === "#112233,#445566,#778899");
+check("...and says what it used and skipped", (await feedback()).includes("Using 3 colors") && (await feedback()).includes("nope"));
+await page.getByLabel("Paste hex codes").fill("hello there");
+check("paste with no colors shows an error and keeps the tiles", (await feedback()).includes("No hex colors found") && (await tiles().count()) === 3);
+await page.getByLabel("Paste hex codes").fill("#0045E5 #FFB81C #FF5C39 #00A878 #8DB4FF #1B1E3C");
+check("six brand colors give six tiles", (await tiles().count()) === 6);
+
+// import a Power BI theme
+await page.locator('input[type="file"]').setInputFiles(`${REPO}/research/handtest/feathers-playfair.powerbi.json`);
+await page.waitForFunction(() => document.querySelector(".ob-feedback")?.textContent?.includes("Imported"));
+check("importing a Power BI theme loads its colors", (await tiles().count()) === 8 && (await tileHex())[0] === "#0A3746");
+check("...and reports what it read", (await feedback()).includes("data colors") && (await feedback()).includes("fonts"));
+const badFile = path.join(OUT, "bad-theme.json");
+fs.writeFileSync(badFile, "{nope");
+await page.locator('input[type="file"]').setInputFiles(badFile);
+await page.waitForFunction(() => document.querySelector(".ob-feedback")?.textContent?.includes("valid JSON"));
+check("a broken file shows a readable error and keeps your colors", (await tiles().count()) === 8);
+const emptyFile = path.join(OUT, "empty-theme.json");
+fs.writeFileSync(emptyFile, '{"hello":"world"}');
+await page.locator('input[type="file"]').setInputFiles(emptyFile);
+await page.waitForFunction(() => document.querySelector(".ob-feedback")?.textContent?.includes("no settings"));
+check("a file with nothing usable is explained", true);
+
+// =============================================================================================
+// B. Fonts
+// =============================================================================================
+await page.locator('[data-palette="tol"]').click();
+await nextBtn().click();
+check("step 2 heading and focus", (await h1()) === "Pick a font" && (await activeTag()) === "H1");
+check("step 2 is the current pill", (await page.locator('.ob-step[aria-current="step"]').innerText()).includes("Fonts"));
+check("Power BI and Tableau font groups", (await page.locator(".ob-sub", { hasText: "Power BI font" }).count()) === 1 && (await page.locator(".ob-sub", { hasText: "Tableau font" }).count()) === 1);
+check("20 Power BI and 13 Tableau fonts", (await page.locator(".ob-fonts").first().locator(".ob-font").count()) === 20 && (await page.locator(".ob-fonts").nth(1).locator(".ob-font").count()) === 13);
+check("current fonts are marked", (await page.locator(".ob-font", { hasText: "Segoe UI" }).first().getAttribute("aria-pressed")) === "true");
+await page.locator(".ob-font", { hasText: "Verdana" }).first().click();
+await page.locator(".ob-font", { hasText: "Tableau Medium" }).click();
+check("choosing a font marks it", (await page.locator(".ob-font", { hasText: "Verdana" }).first().getAttribute("aria-pressed")) === "true");
+await page.waitForFunction(() => /Verdana/.test(getComputedStyle(document.querySelector(".ob-pv-frame .pv-title")).fontFamily));
+check("the Power BI preview switches font", true);
+await page.screenshot({ path: path.join(SHOTS, "ob-2.png") });
+await page.locator(".ob-footer").getByRole("button", { name: "Back" }).click();
+check("Back returns to colors and keeps the choice", (await h1()) === "Start with your colors" && (await palettePressed("tol")) === "true");
+await page.locator(".ob-step", { hasText: "Start" }).click();
+check("step pills navigate directly", (await h1()) === "Name your theme");
+
+// =============================================================================================
+// C. Name and launch
+// =============================================================================================
+check("name defaults to the chosen palette's name", (await page.locator("#ob-name").inputValue()) === "Paul Tol Muted");
+await page.locator("#ob-name").fill("My Brand Theme");
+const files = await page.locator(".ob-files code").allInnerTexts();
+check("file names follow the name as you type", files.join("|") === "my-brand-theme.powerbi.json|my-brand-theme.tableau.json|feathers-my-brand-theme.tps", files.join("|"));
+check("summary names the colors and fonts", (await page.locator(".ob-note").first().innerText()).includes("9 colors") && (await page.locator(".ob-note").first().innerText()).includes("Verdana"));
+await page.screenshot({ path: path.join(SHOTS, "ob-3.png") });
+await page.getByRole("button", { name: "Open the editor" }).click();
+check("launching closes the flow and unlocks the editor", (await page.locator(".onboard").count()) === 0 && (await page.locator(".app").evaluate((e) => e.inert === false)));
+check("the editor has the theme name", (await page.locator("#theme-name").inputValue()) === "My Brand Theme");
+check("...the chosen palette (Tol Muted, 9 swatches)", (await page.locator('[data-key^="chip-categorical-"]').count()) === 9 && (await page.locator('input[data-key="cat-0"]').inputValue()) === "#CC6677");
+await page.locator('.rail-btn[data-tab="text"]').click();
+check("...and the chosen fonts (Verdana in Power BI)", (await page.locator('select[data-key="font-body"]').inputValue()) === "Verdana");
+check("focus lands in the editor", await page.evaluate(() => !!document.activeElement?.closest(".rail")));
+await page.screenshot({ path: path.join(SHOTS, "ob-editor.png") });
+
+// =============================================================================================
+// D. First visit only; New theme; Skip
+// =============================================================================================
+check("the flag is stored", (await page.evaluate(() => localStorage.getItem("feathers.onboarded.v1"))) === "1");
+await page.reload();
+check("reload goes straight to the editor", (await page.locator(".onboard").count()) === 0 && (await page.locator("#theme-name").inputValue()) === "My Brand Theme");
+const savedState = await page.evaluate(() => localStorage.getItem("feathers.state.v1"));
+
+await page.getByRole("button", { name: "New theme" }).click();
+check("New theme reopens the flow", await page.locator(".onboard").isVisible() && (await h1()) === "Start with your colors");
+check("...starting from the current theme (9 Tol colors)", (await tiles().count()) === 9 && (await palettePressed("tol")) === "true");
+await page.getByRole("button", { name: "Skip for now" }).click();
+check("Skip closes it without changing anything", (await page.locator(".onboard").count()) === 0 && (await page.locator("#theme-name").inputValue()) === "My Brand Theme");
+check("focus returns to the editor after Skip", await page.evaluate(() => !!document.activeElement?.closest(".rail")));
+await context.close();
+
+// skipping on a true first visit
+({ context, page } = await fresh());
+await page.getByRole("button", { name: "Skip for now" }).click();
+check("Skip on first visit shows the default Playfair editor", (await page.locator("#theme-name").inputValue()) === "Playfair Data" && (await page.locator(".onboard").count()) === 0);
+await page.reload();
+check("...and doesn't come back after reload", (await page.locator(".onboard").count()) === 0);
+await context.close();
+
+// a user with a saved theme from before the flow existed goes straight to the editor
+context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+await context.addInitScript((state) => { try { localStorage.setItem("feathers.state.v1", state); } catch {} }, savedState);
+page = await context.newPage();
+watch(page);
+await page.goto("http://localhost:4173/");
+await page.locator("#theme-name").waitFor();
+check("a saved theme with no flag skips the flow", (await page.locator(".onboard").count()) === 0 && (await page.locator("#theme-name").inputValue()) === "My Brand Theme");
+await context.close();
+
+// =============================================================================================
+// E. Phone and dark mode
+// =============================================================================================
+({ context, page } = await fresh({ width: 375, height: 812 }));
+check("375px: no horizontal scroll", (await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0 && (await page.evaluate(() => document.querySelector(".onboard").scrollWidth - document.querySelector(".onboard").clientWidth)) <= 0);
+check("375px: the preview is hidden to keep the flow usable", !(await page.locator(".ob-preview").isVisible()));
+check("375px: tiles and Continue are reachable", (await tiles().count()) === 8 && (await nextBtn().isVisible()));
+await page.screenshot({ path: path.join(SHOTS, "ob-375.png") });
+await page.getByRole("button", { name: "Continue" }).click();
+await page.getByRole("button", { name: "Continue" }).click();
+await page.getByRole("button", { name: "Open the editor" }).click();
+check("375px: completes into the editor", (await page.locator(".onboard").count()) === 0 && (await page.locator(".topbar .download").isVisible()));
+await context.close();
+
+({ context, page } = await fresh());
+await page.emulateMedia({ colorScheme: "dark" });
+await page.waitForTimeout(300);
+check("dark mode: flow uses dark surfaces", (await page.locator(".onboard").evaluate((e) => getComputedStyle(e).backgroundColor)) === "rgb(20, 23, 29)");
+await page.screenshot({ path: path.join(SHOTS, "ob-dark.png") });
+await context.close();
+
+check("no console errors", errors.length === 0, errors.join(" | "));
+await browser.close();
+const failed = results.filter((r) => !r.ok);
+console.log(`\n${results.length - failed.length}/${results.length} passed`);
+process.exit(failed.length ? 1 : 0);
