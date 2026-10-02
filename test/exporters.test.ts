@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import Ajv from "ajv";
 import { describe, expect, it } from "vitest";
 import { exportPowerBi } from "../src/export/powerbi";
 import { exportTableauTheme, TABLEAU_MAX_BYTES } from "../src/export/tableauTheme";
@@ -7,20 +5,7 @@ import { exportTableauTps } from "../src/export/tableauTps";
 import { ThemeError } from "../src/model/validate";
 import type { Theme } from "../src/model/theme";
 import { playfair } from "./fixtures";
-
-const schema = (file: string) =>
-  JSON.parse(readFileSync(new URL(`../schemas/${file}`, import.meta.url), "utf-8"));
-
-// Microsoft's published schema contains duplicate enum values, which Ajv's meta-schema check rejects,
-// and non-standard keywords; neither affects validating our output against it.
-const ajv = new Ajv({
-  strict: false,
-  validateSchema: false,
-  allErrors: true,
-  formats: { "uri-reference": true },
-});
-const validatePowerBi = ajv.compile(schema("powerbi-theme-2.157.json"));
-const validateTableau = ajv.compile(schema("tableau-theme-1.0.0.json"));
+import { validatePowerBi, validateTableau } from "./validators";
 
 const withTheme = (patch: Partial<Theme>): Theme => ({ ...playfair, ...patch });
 
