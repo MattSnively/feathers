@@ -36,6 +36,48 @@ await page.goto("http://localhost:4173/");
 const color = (n) => page.getByLabel(`Color ${n}`, { exact: true });
 const focusKey = () => page.evaluate(() => document.activeElement?.dataset?.key ?? null);
 
+// 0. Beginner is the default, and hides detail controls
+const pressed = (name) => page.getByRole("button", { name, exact: true }).getAttribute("aria-pressed");
+const has = async (label) => (await page.getByLabel(label, { exact: true }).count()) > 0;
+check("defaults to Beginner", (await pressed("Beginner")) === "true" && (await pressed("Advanced")) === "false");
+check("Beginner hides status and text colors", !(await page.getByText("Status colors", { exact: true }).count()) && !(await page.getByText("Text colors", { exact: true }).count()));
+check("Beginner shows one Font control, not Body/Title", (await has("Font")) && !(await has("Body font")) && !(await has("Title font")));
+check("Beginner hides font sizes", !(await has("Body size (pt)")) && !(await has("Card value size (pt)")));
+check("Beginner hides line width and the zero line", !(await has("Width (1-5)")) && !(await page.getByText("Zero line", { exact: true }).count()));
+check("Beginner keeps gridline show/style/color", (await page.getByLabel("Style", { exact: true }).count()) === 1);
+check("Beginner hides View file", (await page.getByRole("button", { name: "View file" }).count()) === 0);
+check("Beginner still offers Download and Copy XML", (await page.getByRole("button", { name: "Download" }).count()) === 3 && (await page.getByRole("button", { name: "Copy XML" }).count()) === 1);
+check("Beginner points to Advanced", (await page.getByText("Switch to Advanced for").count()) === 1);
+check("Beginner Power BI lists canvas and page backgrounds", (await has("Canvas (Power BI)")) && (await has("Page (Power BI)")));
+// preview parts whose controls are hidden are not clickable
+const roleCount = (sel) => page.locator(sel).evaluateAll((els) => els.filter((e) => e.getAttribute("role") === "button").length);
+check("card values aren't clickable in Beginner", (await roleCount(".pv-kpi")) === 0);
+check("palette bars still are", (await roleCount('svg rect[aria-label^="Edit color"]')) > 0);
+await page.locator('.pv-title[aria-label="Edit title font"]').focus();
+await page.keyboard.press("Enter");
+check("Beginner title click lands on the single Font control", (await focusKey()) === "font-body", String(await focusKey()));
+// choosing the single font sets both body and title
+await page.getByLabel("Font", { exact: true }).selectOption("Verdana");
+await page.getByRole("button", { name: "Advanced", exact: true }).click();
+check("Advanced shows Body and Title fonts", (await has("Body font")) && (await has("Title font")));
+check("single Beginner font set both body and title", (await page.getByLabel("Body font", { exact: true }).inputValue()) === "Verdana" && (await page.getByLabel("Title font", { exact: true }).inputValue()) === "Verdana");
+check("Advanced shows the detail controls again", (await page.getByText("Status colors", { exact: true }).count()) === 1 && (await has("Body size (pt)")) && (await has("Width (1-5)")));
+check("Advanced makes card values clickable", (await roleCount(".pv-kpi")) > 0);
+check("Advanced offers View file", (await page.getByRole("button", { name: "View file" }).count()) === 3);
+// switching modes keeps the theme
+await color(1).fill("#123456");
+await page.getByRole("button", { name: "Beginner", exact: true }).click();
+check("mode switch keeps edits", (await color(1).inputValue()) === "#123456");
+// Tableau + Beginner shows only the chart-area background
+await page.getByRole("button", { name: "Tableau", exact: true }).click();
+check("Beginner Tableau hides canvas and page backgrounds", !(await has("Canvas (Power BI)")) && !(await has("Page (Power BI)")) && (await has("Chart area")));
+check("Beginner Tableau zero line isn't clickable", (await page.locator('[aria-label="Edit zero line"]').count()) === 0);
+await page.screenshot({ path: path.join(SHOTS, "beginner-tableau.png"), fullPage: false });
+await page.getByRole("button", { name: "Power BI", exact: true }).click();
+await page.getByLabel("Start from").selectOption({ label: "Playfair Data brand" });
+await page.getByRole("button", { name: "Advanced", exact: true }).click();
+check("ready for the Advanced suite", (await pressed("Advanced")) === "true" && (await color(1).inputValue()) === "#0A3746");
+
 // 1. initial render
 check("renders heading", (await page.locator("h1").textContent()) === "Feathers");
 check("loads Playfair by default", (await color(1).inputValue()) === "#0A3746");
@@ -256,6 +298,7 @@ await page.getByRole("button", { name: "Tableau", exact: true }).click();
 await page.reload();
 check("reload restores theme name", (await page.getByLabel("Name", { exact: true }).inputValue()) === "QA Theme #1");
 check("reload restores tool", (await page.getByRole("button", { name: "Tableau", exact: true }).getAttribute("aria-pressed")) === "true");
+check("reload restores Advanced mode", (await pressed("Advanced")) === "true");
 
 // 16. corrupt storage falls back to default
 await page.evaluate(() => localStorage.setItem("feathers.state.v1", "{broken"));

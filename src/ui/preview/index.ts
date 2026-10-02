@@ -1,5 +1,6 @@
 import type { Store } from "../../state/store";
 import { h } from "../dom";
+import { isAvailable, resolveKey } from "../visibility";
 import type { Edit } from "./chart";
 import { powerBiPreview } from "./powerbi";
 import { tableauPreview } from "./tableau";
@@ -16,7 +17,12 @@ export function buildPreview(store: Store, reveal: (key: string) => void): HTMLE
   // Persistent live region so jumping to a control is announced even though the preview redraws.
   const status = h("p", { class: "pv-status", role: "status" });
 
-  const edit: Edit = (el, key, label) => {
+  const edit: Edit = (el, requested, label) => {
+    // Read at call time (the preview redraws on every change), so this always reflects the current mode.
+    const { mode, tool } = store.get();
+    const key = resolveKey(requested, mode);
+    // Parts whose control is hidden in this mode stay plain, so Beginner never jumps to something it hides.
+    if (!isAvailable(key, mode, tool)) return el;
     el.classList.add("editable");
     el.setAttribute("role", "button");
     el.setAttribute("tabindex", "0");
@@ -47,10 +53,12 @@ export function buildPreview(store: Store, reveal: (key: string) => void): HTMLE
   };
 
   const render = () => {
-    const { theme, tool } = store.get();
+    const { theme, tool, mode } = store.get();
     root.replaceChildren(
       h("h3", {}, tool === "powerbi" ? "Power BI preview" : "Tableau preview"),
-      h("p", { class: "hint" }, "Click any part, or tab to it and press Enter, to jump to its setting."),
+      h("p", { class: "hint" }, mode === "beginner"
+        ? "Click a part, or tab to it and press Enter, to jump to its setting. Switch to Advanced to edit more parts."
+        : "Click any part, or tab to it and press Enter, to jump to its setting."),
       tool === "powerbi" ? powerBiPreview(theme, edit) : tableauPreview(theme, edit),
       h("p", { class: "hint" }, CAPTION[tool]),
       status,

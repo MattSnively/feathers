@@ -69,6 +69,7 @@ h3 { font-size: 1rem; margin: 16px 0 8px; }
 .field label, .label { font-size: 0.875rem; color: var(--text-muted); }
 .check-field { display: flex; align-items: center; gap: 8px; }
 .check-field label { color: var(--text); font-size: 1rem; }
+.more-hint { padding: 0 4px; }
 .hint { margin: 0; font-size: 0.875rem; color: var(--text-muted); }
 
 input[type="text"], input[type="number"], select {
@@ -137,7 +138,8 @@ button.primary { background: var(--accent); color: var(--on-accent); border-colo
 .code { margin: 0; padding: 12px; max-height: 320px; overflow: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-size: 0.8125rem; }
 
 @media (prefers-reduced-motion: no-preference) {
-  button, input, select { transition: border-color 0.15s, background-color 0.15s; }
+  /* Segmented toggles switch instantly: fading text and background independently flashes unreadable states. */
+  button:not(.seg), input, select { transition: border-color 0.15s, background-color 0.15s; }
 }
 
 /* Report preview. Colors, fonts and sizes come from the theme via inline styles. */

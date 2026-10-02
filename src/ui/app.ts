@@ -1,7 +1,7 @@
 import type { Theme } from "../model/theme";
 import { blank } from "../presets/blank";
 import { okabeIto, playfair, tolMuted } from "../presets";
-import type { Store, Tool } from "../state/store";
+import type { Mode, Store, Tool } from "../state/store";
 import { buildA11yPanel } from "./a11yPanel";
 import { buildControls } from "./controls";
 import { h } from "./dom";
@@ -20,16 +20,34 @@ const TOOLS: [Tool, string][] = [
   ["tableau", "Tableau"],
 ];
 
-function toolToggle(store: Store): HTMLElement {
-  const buttons = TOOLS.map(([tool, label]) =>
-    h("button", { type: "button", class: "seg", onclick: () => store.setTool(tool) }, label));
-  const sync = () => buttons.forEach((b, i) => b.setAttribute("aria-pressed", String(TOOLS[i]![0] === store.get().tool)));
+const MODES: [Mode, string][] = [
+  ["beginner", "Beginner"],
+  ["advanced", "Advanced"],
+];
+
+/** Segmented toggle; buttons stay in place and only aria-pressed changes, so keyboard focus is never lost. */
+function segmented<T extends string>(
+  store: Store,
+  label: string,
+  options: [T, string][],
+  current: () => T,
+  choose: (value: T) => void,
+): HTMLElement {
+  const labelId = `seg-${label.replace(/\W+/g, "-").toLowerCase()}`;
+  const buttons = options.map(([value, text]) => h("button", { type: "button", class: "seg", onclick: () => choose(value) }, text));
+  const sync = () => buttons.forEach((b, i) => b.setAttribute("aria-pressed", String(options[i]![0] === current())));
   store.subscribe(sync);
   sync();
   return h("div", { class: "field" },
-    h("span", { class: "label", id: "tool-label" }, "I'm building for"),
-    h("div", { class: "seg-group", role: "group", "aria-labelledby": "tool-label" }, ...buttons));
+    h("span", { class: "label", id: labelId }, label),
+    h("div", { class: "seg-group", role: "group", "aria-labelledby": labelId }, ...buttons));
 }
+
+const toolToggle = (store: Store) =>
+  segmented(store, "I'm building for", TOOLS, () => store.get().tool, (t) => store.setTool(t));
+
+const modeToggle = (store: Store) =>
+  segmented(store, "Detail level", MODES, () => store.get().mode, (m) => store.setMode(m));
 
 function presetPicker(store: Store): HTMLElement {
   const select = h("select", {
@@ -75,7 +93,7 @@ export function mountApp(root: HTMLElement, store: Store): void {
       h("div", { class: "brand" },
         h("h1", {}, "Feathers"),
         h("p", {}, "One theme for Power BI and Tableau: colors, fonts, gridlines and backgrounds.")),
-      h("div", { class: "top-controls" }, toolToggle(store), presetPicker(store))),
+      h("div", { class: "top-controls" }, toolToggle(store), modeToggle(store), presetPicker(store))),
     h("main", { class: "workspace" },
       controls.element,
       h("section", { class: "preview", "aria-labelledby": "preview-title" },

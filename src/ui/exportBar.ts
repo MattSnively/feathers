@@ -12,9 +12,10 @@ export function buildExportBar(store: Store): HTMLElement {
   const openGuides = new Set<ExportId>();
 
   const card = (spec: ExportSpec) => {
-    const { theme, tool } = store.get();
+    const { theme, tool, mode } = store.get();
     const result = runExport(spec, theme);
     const active = spec.tool === tool;
+    const showFile = mode === "advanced" && viewing === spec.id && result.ok;
 
     const copyXml = async () => {
       const ok = await copyText(tableauPaletteBlocks(theme));
@@ -49,16 +50,19 @@ export function buildExportBar(store: Store): HTMLElement {
         spec.id === "tableau-tps"
           ? h("button", { type: "button", class: "secondary", disabled: !result.ok, "data-key": `${spec.id}-copy`, onclick: copyXml }, "Copy XML")
           : null,
-        h("button", {
-          type: "button",
-          class: "secondary",
-          disabled: !result.ok,
-          "aria-expanded": String(viewing === spec.id),
-          "data-key": `${spec.id}-view`,
-          onclick: () => { viewing = viewing === spec.id ? null : spec.id; render(); },
-        }, viewing === spec.id ? "Hide file" : "View file"),
+        // Reading raw file contents is an Advanced feature.
+        mode === "advanced"
+          ? h("button", {
+              type: "button",
+              class: "secondary",
+              disabled: !result.ok,
+              "aria-expanded": String(viewing === spec.id),
+              "data-key": `${spec.id}-view`,
+              onclick: () => { viewing = viewing === spec.id ? null : spec.id; render(); },
+            }, viewing === spec.id ? "Hide file" : "View file")
+          : null,
       ),
-      viewing === spec.id && result.ok ? h("pre", { class: "code", tabIndex: 0 }, result.content) : null,
+      showFile ? h("pre", { class: "code", tabIndex: 0 }, result.content) : null,
     );
   };
 

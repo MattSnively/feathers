@@ -3,6 +3,7 @@ import type { LineStyle } from "../model/theme";
 import type { Store } from "../state/store";
 import { h, rebuild } from "./dom";
 import { checkboxField, colorField, numberField, selectField } from "./fields";
+import { isAvailable } from "./visibility";
 
 type PaletteTab = "categorical" | "sequential" | "diverging";
 
@@ -126,7 +127,7 @@ export function buildControls(store: Store): { element: HTMLElement; reveal: (ke
         "aria-pressed": String(tab === name),
         onclick: () => { tab = name; render(); },
       }, name[0]!.toUpperCase() + name.slice(1)));
-    const { theme } = store.get();
+    const { theme, mode } = store.get();
     const roles = (group: "status" | "text", items: [string, string][]) =>
       items.map(([key, label]) =>
         colorField(label, (theme[group] as Record<string, string>)[key]!,
@@ -136,19 +137,30 @@ export function buildControls(store: Store): { element: HTMLElement; reveal: (ke
       ...(tab === "categorical" ? categoricalRows()
         : tab === "sequential" ? rampRows("sequential", ["Low end", "High end"])
         : rampRows("diverging", ["Low end", "Center", "High end"])),
-      h("h3", {}, "Status colors"),
-      hint("Used by Power BI KPI and waterfall visuals and conditional-format gradients."),
-      ...roles("status", [["good", "Good"], ["neutral", "Neutral"], ["bad", "Bad"]]),
-      h("h3", {}, "Text colors"),
-      ...roles("text", [["primary", "Primary text"], ["secondary", "Secondary text"], ["muted", "Muted text"]]),
+      ...(mode === "advanced"
+        ? [
+            h("h3", {}, "Status colors"),
+            hint("Used by Power BI KPI and waterfall visuals and conditional-format gradients."),
+            ...roles("status", [["good", "Good"], ["neutral", "Neutral"], ["bad", "Bad"]]),
+            h("h3", {}, "Text colors"),
+            ...roles("text", [["primary", "Primary text"], ["secondary", "Secondary text"], ["muted", "Muted text"]]),
+          ]
+        : []),
     );
   };
 
   const fontsPanel = () => {
-    const { theme, tool } = store.get();
+    const { theme, tool, mode } = store.get();
     const key = tool === "powerbi" ? "powerBi" : "tableau";
     const list = tool === "powerbi" ? POWER_BI_FONTS : TABLEAU_FONTS;
-    return panel("fonts", `Fonts (${tool === "powerbi" ? "Power BI" : "Tableau"})`,
+    const title = `Fonts (${tool === "powerbi" ? "Power BI" : "Tableau"})`;
+    if (mode === "beginner") {
+      return panel("fonts", title,
+        hint("Only fonts that ship with the tool, so what you see is what imports. One font is used for all text; Advanced sets titles and sizes separately."),
+        selectField("Font", list, theme.fonts[key].body, (v) => store.updateTheme((t) => { t.fonts[key].body = v; t.fonts[key].title = v; }), { key: "font-body" }),
+      );
+    }
+    return panel("fonts", title,
       hint("Only fonts that ship with the tool, so what you see is what imports."),
       selectField("Body font", list, theme.fonts[key].body, (v) => store.updateTheme((t) => { t.fonts[key].body = v; }), { key: "font-body" }),
       selectField("Title font", list, theme.fonts[key].title, (v) => store.updateTheme((t) => { t.fonts[key].title = v; }), { key: "font-title" }),
@@ -160,27 +172,32 @@ export function buildControls(store: Store): { element: HTMLElement; reveal: (ke
     );
   };
 
-  const lineEditor = (id: "gridline" | "zeroline", title: string) => {
+  const lineEditor = (id: "gridline" | "zeroline", title: string, withWidth: boolean) => {
     const line = store.get().theme[id];
     return [
       h("h3", {}, title),
       checkboxField("Show", line.visible, (v) => store.updateTheme((t) => { t[id].visible = v; })),
       selectField("Style", LINE_STYLES, line.style, (v) => store.updateTheme((t) => { t[id].style = v as LineStyle; })),
-      numberField("Width (1-5)", line.width, { min: 1, max: 5 }, (n) => store.updateTheme((t) => { t[id].width = n; })),
+      withWidth ? numberField("Width (1-5)", line.width, { min: 1, max: 5 }, (n) => store.updateTheme((t) => { t[id].width = n; })) : null,
       colorField("Color", line.color, (hex) => store.updateTheme((t) => { t[id].color = hex; }), { key: `${id}-color` }),
     ];
   };
 
+  // Beginner gets gridlines without width, and no zero line.
   const linesPanel = () =>
-    panel("lines", "Lines",...lineEditor("gridline", "Gridlines"), ...lineEditor("zeroline", "Zero line"));
+    store.get().mode === "advanced"
+      ? panel("lines", "Lines", ...lineEditor("gridline", "Gridlines", true), ...lineEditor("zeroline", "Zero line", true))
+      : panel("lines", "Lines", ...lineEditor("gridline", "Gridlines", false));
 
   const backgroundsPanel = () => {
-    const { background } = store.get().theme;
+    const { theme: { background }, mode, tool } = store.get();
     const field = (key: "canvas" | "page" | "container", label: string) =>
       colorField(label, background[key], (hex) => store.updateTheme((t) => { t.background[key] = hex; }), { key: `bg-${key}` });
+    // Beginner only lists backgrounds the selected tool uses; Tableau has no canvas or page.
+    const show = (key: string) => isAvailable(`bg-${key}`, mode, tool);
     return panel("backgrounds", "Backgrounds",
-      field("canvas", "Canvas (Power BI)"),
-      field("page", "Page (Power BI)"),
+      show("canvas") ? field("canvas", "Canvas (Power BI)") : null,
+      show("page") ? field("page", "Page (Power BI)") : null,
       field("container", "Chart area"),
       hint("Chart area is the visual container in Power BI and the view background in Tableau."),
     );
@@ -203,13 +220,17 @@ export function buildControls(store: Store): { element: HTMLElement; reveal: (ke
   function render() {
     const key = focusKey;
     focusKey = null;
-    rebuild(root, () => [namePanel(), colorsPanel(), fontsPanel(), linesPanel(), backgroundsPanel()], key);
+    const more = store.get().mode === "beginner"
+      ? [h("p", { class: "hint more-hint" }, "Switch to Advanced for text and status colors, font sizes, line widths and the zero line.")]
+      : [];
+    rebuild(root, () => [namePanel(), colorsPanel(), fontsPanel(), linesPanel(), backgroundsPanel(), ...more], key);
   }
 
   /** Opens the panel for `key`, switches palette tab if needed, and moves focus to that control. */
   function reveal(key: string) {
+    const { mode, tool } = store.get();
     const panelId = panelFor(key);
-    if (!panelId) return;
+    if (!panelId || !isAvailable(key, mode, tool)) return;
     collapsed.delete(panelId);
     if (key.startsWith("cat-")) tab = "categorical";
     else if (key.startsWith("sequential-")) tab = "sequential";
