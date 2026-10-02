@@ -1,0 +1,14 @@
+{
+  "version": "1.0.0",
+  "base-theme": "smooth",
+  "styles": {
+    "all":             { "font-family": "Tableau Book", "font-color": "#4A403A" },
+    "worksheet-title": { "font-family": "Tableau Semibold", "font-size": 14, "font-color": "#201914" },
+    "dashboard-title": { "font-family": "Tableau Semibold", "font-size": 18, "font-color": "#201914", "font-weight": "bold" },
+    "tooltip":         { "font-family": "Tableau Book", "font-size": 10, "font-color": "#201914" },
+    "view":            { "background-color": "#F3F4EF" },
+    "gridline":        { "line-visibility": "on", "line-pattern": "dotted", "line-width": 1, "line-color": "#DDDAD3" },
+    "zeroline":        { "line-visibility": "on", "line-pattern": "solid", "line-width": 1, "line-color": "#9C8F82" },
+    "mark":            { "mark-color": "#0A3746" }
+  }
+}
