@@ -13,7 +13,6 @@ import { h } from "./dom";
 import { icon, logoMark } from "./icons";
 import type { Edit } from "./preview/chart";
 import { powerBiPreview } from "./preview/powerbi";
-import { tableauPreview } from "./preview/tableau";
 
 const PALETTES = [
   { id: "playfair", title: "Playfair Data", blurb: "Kingfisher blue with an orange feather accent, from the Playfair Data brand.", theme: playfair },
@@ -25,13 +24,15 @@ const PALETTES = [
   { id: "starter", title: "Starter", blurb: "Four clean colors to build your own palette from.", theme: blank },
 ] as const;
 
-const STEPS = ["Colors", "Fonts", "Start"] as const;
+const STEP_COUNT = 3;
 
 const HEADINGS: [string, string][] = [
-  ["Build your data viz theme", "Bring your brand's own colors to Power BI and Tableau, or start from a palette below. Fine tune and import back to your tool of choice."],
+  ["Customize your colors and fonts before you even start your dashboard.", "Import a custom .json file directly into Tableau or Power BI with Feathers"],
   ["Pick a font", "Only fonts that ship with each tool, so what you see is what imports. You can change them later."],
   ["Name your theme", "This names your downloaded files. You can rename it any time."],
 ];
+
+const CONTINUE_LABELS = ["Continue to fonts", "Continue", "Open the editor"];
 
 const sameColors = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((c, i) => c === b[i]);
 
@@ -59,7 +60,7 @@ export interface OnboardingHandlers {
 }
 
 /**
- * The first-run flow: Colors, Fonts, Start. Works on a private draft of the theme and hands it back
+ * The first-run flow: Colors, Fonts, Start. The example dashboard stays on the left while the choices change on the right. Works on a private draft of the theme and hands it back
  * only when the user launches the editor, so skipping never changes anything.
  */
 export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): { element: HTMLElement; focusStart: () => void } {
@@ -69,25 +70,26 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
   // Where the name came from decides whether a palette choice may rename the theme: only typed names are sticky.
   let nameSource: "default" | "import" | "typed" = "default";
 
-  // ---- Live preview ---------------------------------------------------------------------------
+  // ---- Example dashboard ----------------------------------------------------------------------
 
-  const powerFrame = h("div", { class: "ob-pv-frame" });
-  const tableauFrame = h("div", { class: "ob-pv-frame" });
-  const block = (name: string, file: string, frame: HTMLElement) => {
-    const clip = h("div", { class: "ob-pv-clip" }, frame);
-    // The report is laid out at a fixed design width and scaled to whatever column it lands in.
-    new ResizeObserver(() => {
-      if (clip.clientWidth > 0) frame.style.setProperty("zoom", String(clip.clientWidth / DESIGN_WIDTH));
-    }).observe(clip);
-    return h("section", { class: "ob-pv" }, h("div", { class: "ob-pv-head" }, h("strong", {}, name), h("code", {}, file)), clip);
-  };
-  const previewPane = h("aside", { class: "ob-preview", "aria-hidden": "true" },
-    block("Power BI", "theme.json", powerFrame),
-    block("Tableau", ".tps + theme.json", tableauFrame));
+  const frame = h("div", { class: "ob-pv-frame" });
+  const clip = h("div", { class: "ob-pv-clip" }, frame);
+  // The report is laid out at a fixed design width and scaled to whatever column it lands in.
+  new ResizeObserver(() => {
+    if (clip.clientWidth > 0) frame.style.setProperty("zoom", String(clip.clientWidth / DESIGN_WIDTH));
+  }).observe(clip);
+  const example = h("section", { class: "ob-example", "aria-labelledby": "ob-example-title" },
+    h("div", { class: "ob-example-head" }, h("h2", { id: "ob-example-title" }, "Example dashboard"), h("span", {}, "Updates as you choose")),
+    // Decorative: the same choices are all available as text on the right.
+    h("div", { "aria-hidden": "true" }, clip));
+
+  // The dashboard has one font slot, so it shows whichever tool's font was picked last.
+  let previewFontTool: "powerBi" | "tableau" = "powerBi";
 
   function renderPreview() {
-    powerFrame.replaceChildren(powerBiPreview(draft, noEdit));
-    tableauFrame.replaceChildren(tableauPreview(draft, noEdit));
+    const shown = structuredClone(draft);
+    if (previewFontTool === "tableau") shown.fonts.powerBi = shown.fonts.tableau;
+    frame.replaceChildren(powerBiPreview(shown, noEdit));
   }
   let queued = false;
   const schedulePreview = () => {
@@ -241,6 +243,7 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
           onclick: () => {
             draft.fonts[tool].body = name;
             draft.fonts[tool].title = name;
+            previewFontTool = tool;
             buttons.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
             schedulePreview();
           },
@@ -299,27 +302,22 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
 
   // ---- Shell ----------------------------------------------------------------------------------
 
-  const main = h("main", { class: "ob-main" });
-  const pills = STEPS.map((label, i) =>
-    h("button", { type: "button", class: "ob-step", onclick: () => go(i) }, h("span", {}, String(i + 1)), label));
+  const copy = h("div", { class: "ob-copy" });
+  const content = h("div", { class: "ob-content" });
 
   function go(next: number) {
     step = next;
     const [title, lead] = HEADINGS[step]!;
     const heading = h("h1", { tabIndex: -1 }, title);
-    const body = step === 0 ? colorsStep() : step === 1 ? fontsStep() : startStep();
-    const last = step === STEPS.length - 1;
-    main.replaceChildren(
+    const last = step === STEP_COUNT - 1;
+    // The way forward sits right under the header so it can't be missed below a long list of choices.
+    copy.replaceChildren(
       heading,
       h("p", { class: "ob-lead" }, lead),
-      ...body,
-      h("div", { class: "ob-footer" },
-        step > 0 ? h("button", { type: "button", class: "btn big", onclick: () => go(step - 1) }, "Back") : null,
-        last
-          ? h("button", { type: "button", class: "btn primary big", onclick: finish }, "Open the editor")
-          : h("button", { type: "button", class: "btn primary big", onclick: () => go(step + 1) }, "Continue")),
-    );
-    pills.forEach((p, i) => (i === step ? p.setAttribute("aria-current", "step") : p.removeAttribute("aria-current")));
+      h("div", { class: "ob-actions" },
+        h("button", { type: "button", class: "btn primary big", onclick: last ? finish : () => go(step + 1) }, CONTINUE_LABELS[step]!, last ? null : icon("right", 18)),
+        step > 0 ? h("button", { type: "button", class: "btn big", onclick: () => go(step - 1) }, "Back") : null));
+    content.replaceChildren(...(step === 0 ? colorsStep() : step === 1 ? fontsStep() : startStep()));
     heading.focus({ preventScroll: true });
     renderPreview();
     document.querySelector(".onboard")?.scrollTo({ top: 0 });
@@ -328,9 +326,8 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
   const element = h("div", { class: "onboard", role: "region", "aria-label": "Get started" },
     h("header", { class: "ob-head" },
       h("div", { class: "brand" }, logoMark(30), h("span", { class: "brand-name" }, "Feathers")),
-      h("nav", { class: "ob-steps", "aria-label": "Steps" }, ...pills),
       h("button", { type: "button", class: "ob-skip", onclick: handlers.onSkip }, "Skip for now")),
-    h("div", { class: "ob-body" }, main, previewPane));
+    h("div", { class: "ob-body" }, h("div", { class: "ob-left" }, copy, example), content));
 
   return {
     element,

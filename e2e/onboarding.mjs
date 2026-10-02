@@ -46,15 +46,19 @@ const activeTag = () => page.evaluate(() => document.activeElement?.tagName);
 const nextBtn = () => page.getByRole("button", { name: "Continue" });
 
 check("first visit shows the flow", await ob.isVisible());
-check("heading is 'Build your data viz theme' and has focus", (await h1()) === "Build your data viz theme" && (await activeTag()) === "H1");
-check("three steps, first is current", (await page.locator(".ob-step").count()) === 3 && (await page.locator('.ob-step[aria-current="step"]').innerText()).includes("Colors"));
+check("heading is 'Customize your colors and fonts before you even start your dashboard.' and has focus", (await h1()) === "Customize your colors and fonts before you even start your dashboard." && (await activeTag()) === "H1");
+check("no step navigation in the header", (await page.locator(".ob-head nav, .ob-step").count()) === 0);
+check("subhead explains the output", (await page.locator(".ob-lead").innerText()).startsWith("Import a custom .json file directly into Tableau or Power BI"));
+const actions = await page.locator(".ob-actions").boundingBox(); const firstCard = await page.locator(".ob-own").boundingBox();
+check("Continue sits under the header text, above the choices and in view", actions.y + actions.height < 400 && (await page.locator(".ob-actions").getByRole("button", { name: "Continue to fonts" }).isVisible()), JSON.stringify(actions));
 check("the editor behind the flow is inert", await page.locator(".app").evaluate((e) => e.inert === true));
 check("Playfair is preselected, own colors is not", (await palettePressed("playfair")) === "true" && !(await page.locator(".ob-own.is-selected").count()));
 check("8 color tiles from the preselected palette", (await tiles().count()) === 8 && (await tileHex())[0] === "#0A3746");
-check("live preview shows both tools", (await page.locator(".ob-pv").count()) === 2 && (await page.locator(".ob-pv-head code").allInnerTexts()).join("|") === "theme.json|.tps + theme.json");
+check("one example dashboard, labeled, on the left", (await page.locator(".ob-pv-frame").count()) === 1 && (await page.locator(".ob-example h2").innerText()) === "Example dashboard" && (await page.locator(".ob-example").boundingBox()).x < firstCard.x);
+check("palettes and own colors are on the right, below nothing but the header", (await page.locator(".ob-palettes").boundingBox()).x > (await page.locator(".ob-example").boundingBox()).x + 200);
 check("preview uses the palette", (await previewFill()) === "#0A3746");
-check("preview is decorative (hidden from assistive tech)", (await page.locator(".ob-preview").getAttribute("aria-hidden")) === "true");
-check("both previews fit in view at 1920x1080", await page.locator(".ob-preview").evaluate((e) => e.getBoundingClientRect().bottom <= innerHeight), String(await page.locator(".ob-preview").evaluate((e) => e.getBoundingClientRect().bottom)));
+check("preview is decorative (hidden from assistive tech)", (await page.locator(".ob-example [aria-hidden=\"true\"]").count()) === 1);
+check("the example fits in view at 1920x1080", await page.locator(".ob-example").evaluate((e) => e.getBoundingClientRect().bottom <= innerHeight), String(await page.locator(".ob-example").evaluate((e) => e.getBoundingClientRect().bottom)));
 await page.screenshot({ path: path.join(SHOTS, "ob-1.png") });
 
 // keyboard stays inside the flow
@@ -107,20 +111,20 @@ check("a file with nothing usable is explained", true);
 await page.locator('[data-palette="tol"]').click();
 await nextBtn().click();
 check("step 2 heading and focus", (await h1()) === "Pick a font" && (await activeTag()) === "H1");
-check("step 2 is the current pill", (await page.locator('.ob-step[aria-current="step"]').innerText()).includes("Fonts"));
 check("Power BI and Tableau font groups", (await page.locator(".ob-sub", { hasText: "Power BI font" }).count()) === 1 && (await page.locator(".ob-sub", { hasText: "Tableau font" }).count()) === 1);
 check("20 Power BI and 13 Tableau fonts", (await page.locator(".ob-fonts").first().locator(".ob-font").count()) === 20 && (await page.locator(".ob-fonts").nth(1).locator(".ob-font").count()) === 13);
 check("current fonts are marked", (await page.locator(".ob-font", { hasText: "Segoe UI" }).first().getAttribute("aria-pressed")) === "true");
-await page.locator(".ob-font", { hasText: "Verdana" }).first().click();
 await page.locator(".ob-font", { hasText: "Tableau Medium" }).click();
+await page.locator(".ob-font", { hasText: "Verdana" }).first().click();
 check("choosing a font marks it", (await page.locator(".ob-font", { hasText: "Verdana" }).first().getAttribute("aria-pressed")) === "true");
 await page.waitForFunction(() => /Verdana/.test(getComputedStyle(document.querySelector(".ob-pv-frame .pv-title")).fontFamily));
 check("the Power BI preview switches font", true);
 await page.screenshot({ path: path.join(SHOTS, "ob-2.png") });
-await page.locator(".ob-footer").getByRole("button", { name: "Back" }).click();
-check("Back returns to colors and keeps the choice", (await h1()) === "Build your data viz theme" && (await palettePressed("tol")) === "true");
-await page.locator(".ob-step", { hasText: "Start" }).click();
-check("step pills navigate directly", (await h1()) === "Name your theme");
+await page.locator(".ob-actions").getByRole("button", { name: "Back" }).click();
+check("Back returns to colors and keeps the choice", (await h1()) === "Customize your colors and fonts before you even start your dashboard." && (await palettePressed("tol")) === "true");
+await nextBtn().click();
+await nextBtn().click();
+check("Continue twice reaches the naming step", (await h1()) === "Name your theme");
 
 // =============================================================================================
 // C. Name and launch
@@ -149,7 +153,7 @@ check("reload goes straight to the editor", (await page.locator(".onboard").coun
 const savedState = await page.evaluate(() => localStorage.getItem("feathers.state.v1"));
 
 await page.getByRole("button", { name: "New theme" }).click();
-check("New theme reopens the flow", await page.locator(".onboard").isVisible() && (await h1()) === "Build your data viz theme");
+check("New theme reopens the flow", await page.locator(".onboard").isVisible() && (await h1()) === "Customize your colors and fonts before you even start your dashboard.");
 check("...starting from the current theme (9 Tol colors)", (await tiles().count()) === 9 && (await palettePressed("tol")) === "true");
 await page.getByRole("button", { name: "Skip for now" }).click();
 check("Skip closes it without changing anything", (await page.locator(".onboard").count()) === 0 && (await page.locator("#theme-name").inputValue()) === "My Brand Theme");
@@ -179,7 +183,7 @@ await context.close();
 // =============================================================================================
 ({ context, page } = await fresh({ width: 375, height: 812 }));
 check("375px: no horizontal scroll", (await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0 && (await page.evaluate(() => document.querySelector(".onboard").scrollWidth - document.querySelector(".onboard").clientWidth)) <= 0);
-check("375px: the preview is hidden to keep the flow usable", !(await page.locator(".ob-preview").isVisible()));
+check("375px: the example is hidden to keep the flow usable", !(await page.locator(".ob-example").isVisible()));
 check("375px: tiles and Continue are reachable", (await tiles().count()) === 8 && (await nextBtn().isVisible()));
 await page.screenshot({ path: path.join(SHOTS, "ob-375.png") });
 await page.getByRole("button", { name: "Continue" }).click();
