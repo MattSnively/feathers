@@ -4,7 +4,7 @@
  *
  * Provenance (see research/FINDINGS.md): Tableau list from the Tableau font family plus the system
  * fonts Tableau documents as server-safe; Power BI list from the format-pane font dropdown, minus
- * symbol fonts. Not yet confirmed against a live dropdown (bd feathers-5ct.11).
+ * symbol fonts. Both lists confirmed against live dropdowns in Tableau Desktop and Power BI Desktop.
  */
 export const TABLEAU_FONTS = [
   "Tableau Book",
