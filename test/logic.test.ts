@@ -4,6 +4,7 @@ import { tableauPaletteBlocks, exportTableauTps } from "../src/export/tableauTps
 import { normalizeHex } from "../src/model/hex";
 import { loadState, saveState } from "../src/state/persist";
 import { createStore } from "../src/state/store";
+import { isAvailable, resolveKey } from "../src/ui/visibility";
 import { okabeIto, playfair } from "../src/presets";
 
 describe("normalizeHex", () => {
@@ -61,7 +62,7 @@ describe("tableauPaletteBlocks", () => {
 });
 
 describe("store", () => {
-  const make = () => createStore({ theme: playfair, tool: "powerbi" });
+  const make = () => createStore({ theme: playfair, tool: "powerbi", mode: "beginner" });
 
   it("updates immutably and does not mutate the preset", () => {
     const store = make();
@@ -94,6 +95,16 @@ describe("store", () => {
     expect(kinds).toEqual(["value", "structure", "structure", "structure"]);
   });
 
+  it("switches mode as a structural change, keeping the theme", () => {
+    const store = make();
+    const kinds: string[] = [];
+    store.subscribe((_s, kind) => kinds.push(kind));
+    store.setMode("advanced");
+    expect(store.get().mode).toBe("advanced");
+    expect(store.get().theme).toEqual(playfair);
+    expect(kinds).toEqual(["structure"]);
+  });
+
   it("stops notifying after unsubscribe", () => {
     const store = make();
     const spy = vi.fn();
@@ -115,8 +126,8 @@ describe("persistence", () => {
 
   it("round-trips theme and tool", () => {
     const storage = fakeStorage();
-    saveState({ theme: okabeIto, tool: "tableau" }, storage);
-    expect(loadState(storage)).toEqual({ theme: okabeIto, tool: "tableau" });
+    saveState({ theme: okabeIto, tool: "tableau", mode: "advanced" }, storage);
+    expect(loadState(storage)).toEqual({ theme: okabeIto, tool: "tableau", mode: "advanced" });
   });
 
   it("returns null when nothing is stored, storage is absent, or JSON is corrupt", () => {
@@ -125,6 +136,14 @@ describe("persistence", () => {
     const storage = fakeStorage();
     storage.setItem("feathers.state.v1", "{not json");
     expect(loadState(storage)).toBeNull();
+  });
+
+  it("defaults to Beginner for saved states from before modes existed, or with a bad mode", () => {
+    const storage = fakeStorage();
+    storage.setItem("feathers.state.v1", JSON.stringify({ theme: playfair, tool: "powerbi" }));
+    expect(loadState(storage)?.mode).toBe("beginner");
+    storage.setItem("feathers.state.v1", JSON.stringify({ theme: playfair, tool: "powerbi", mode: "expert" }));
+    expect(loadState(storage)?.mode).toBe("beginner");
   });
 
   it("discards a stored theme that is incomplete", () => {
@@ -143,7 +162,40 @@ describe("persistence", () => {
         throw new Error("blocked");
       },
     };
-    expect(() => saveState({ theme: playfair, tool: "powerbi" }, throwing)).not.toThrow();
+    expect(() => saveState({ theme: playfair, tool: "powerbi", mode: "beginner" }, throwing)).not.toThrow();
     expect(loadState(throwing)).toBeNull();
+  });
+});
+
+describe("mode visibility", () => {
+  it("shows everything in Advanced", () => {
+    for (const key of ["text-muted", "status-good", "size-callout", "zeroline-color", "font-title", "bg-canvas"]) {
+      expect(isAvailable(key, "advanced", "tableau")).toBe(true);
+    }
+  });
+
+  it("keeps the essentials in Beginner", () => {
+    for (const key of ["cat-0", "cat-7", "sequential-1", "diverging-2", "bg-container", "gridline-color", "font-body"]) {
+      expect(isAvailable(key, "beginner", "powerbi"), key).toBe(true);
+    }
+  });
+
+  it("hides detail controls in Beginner", () => {
+    for (const key of ["text-primary", "text-muted", "status-bad", "size-body", "size-callout", "zeroline-color", "font-title"]) {
+      expect(isAvailable(key, "beginner", "powerbi"), key).toBe(false);
+    }
+  });
+
+  it("offers canvas and page backgrounds only for Power BI in Beginner", () => {
+    expect(isAvailable("bg-canvas", "beginner", "powerbi")).toBe(true);
+    expect(isAvailable("bg-page", "beginner", "powerbi")).toBe(true);
+    expect(isAvailable("bg-canvas", "beginner", "tableau")).toBe(false);
+    expect(isAvailable("bg-page", "beginner", "tableau")).toBe(false);
+  });
+
+  it("sends title-font clicks to the single Beginner font control", () => {
+    expect(resolveKey("font-title", "beginner")).toBe("font-body");
+    expect(resolveKey("font-title", "advanced")).toBe("font-title");
+    expect(resolveKey("cat-1", "beginner")).toBe("cat-1");
   });
 });

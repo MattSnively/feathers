@@ -19,7 +19,7 @@ function defaultStorage(): StorageLike | null {
 
 export function saveState(state: AppState, storage: StorageLike | null = defaultStorage()): void {
   try {
-    storage?.setItem(KEY, JSON.stringify({ theme: state.theme, tool: state.tool }));
+    storage?.setItem(KEY, JSON.stringify({ theme: state.theme, tool: state.tool, mode: state.mode }));
   } catch {
     // Quota or blocked storage: losing persistence is acceptable.
   }
@@ -36,7 +36,8 @@ export function loadState(storage: StorageLike | null = defaultStorage()): AppSt
     exportPowerBi(parsed.theme);
     exportTableauTheme(parsed.theme);
     exportTableauTps(parsed.theme);
-    return { theme: parsed.theme, tool: parsed.tool };
+    // `mode` arrived after the first release, so older saved states have none: default to Beginner.
+    return { theme: parsed.theme, tool: parsed.tool, mode: parsed.mode === "advanced" ? "advanced" : "beginner" };
   } catch {
     return null;
   }
