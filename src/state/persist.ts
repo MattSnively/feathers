@@ -5,11 +5,11 @@ import type { AppState } from "./store";
 
 const KEY = "feathers.state.v1";
 
-type StorageLike = Pick<Storage, "getItem" | "setItem">;
+export type StorageLike = Pick<Storage, "getItem" | "setItem">;
 
 // Storage can be missing or throw (private windows, blocked site data), so every access is guarded
 // and the app must work without it.
-function defaultStorage(): StorageLike | null {
+export function defaultStorage(): StorageLike | null {
   try {
     return globalThis.localStorage ?? null;
   } catch {
