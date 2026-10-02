@@ -1,6 +1,13 @@
-# Project Instructions for AI Agents
+# Feathers
 
-This file provides instructions and context for AI coding agents working on this project.
+**What:** Static theme editor that exports Power BI theme .json, Tableau theme .json and Tableau Preferences.tps from one palette/fonts/gridlines/backgrounds model, with per-tool import guides.
+**Stack:** Vite + TypeScript (vanilla UI), Vitest. No backend, no accounts.
+**Run:** `npm run dev` (once scaffolded, see epic feathers-5ct)
+**Test:** `npm test`
+**Deploy:** GitHub Pages (MattSnively/feathers); mind the subpath base config.
+
+Scope decisions and preset hex values live in `bd remember` (run `bd prime`). Fonts are limited to each tool's default fonts. Keep the core embeddable (no framework) for a later playfair.com embed.
+Use `~/AppData/Roaming/npm/bd`, not the stale `~/bin/bd` that shadows it.
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:7510c1e2 -->
 ## Beads Issue Tracker
@@ -51,20 +58,3 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Build & Test
-
-_Add your build and test commands here_
-
-```bash
-# Example:
-# npm install
-# npm test
-```
-
-## Architecture Overview
-
-_Add a brief overview of your project architecture_
-
-## Conventions & Patterns
-
-_Add your project-specific conventions here_
