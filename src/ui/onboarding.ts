@@ -132,6 +132,9 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
     };
 
     function renderTiles() {
+      // Balanced rows: one row up to six colors, then as many even rows as needed, never a lone orphan tile.
+      const count = draft.palette.categorical.length;
+      tilesHost.style.setProperty("--cols", String(count <= 6 ? count : Math.ceil(count / Math.ceil(count / 6))));
       tilesHost.replaceChildren(...draft.palette.categorical.map((hex, i) => {
         const num = h("span", { class: "ob-tile-n" }, String(i + 1));
         const code = h("span", { class: "ob-tile-hex" }, hex);
@@ -158,7 +161,7 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
     const paste = h("input", {
       type: "text",
       class: "ob-paste",
-      placeholder: "Paste hex codes, like #0045E5 #FFB81C #FF5C39",
+      placeholder: "Paste hex codes, e.g. #0045E5 #FFB81C",
       "aria-label": "Paste hex codes",
       autocomplete: "off",
       spellcheck: false,
