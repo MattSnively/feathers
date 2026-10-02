@@ -56,3 +56,12 @@ Validated 2026-10-01: Power BI file VALID vs schema 2.157; Tableau file VALID vs
 2. Confirm which fonts are usable: Tableau theme `font-family` values; Power BI default font list (Segoe UI family, DIN, others).
 3. Check whether Tableau Cloud/Server/Public honor theme JSON (docs say Desktop 2025.1 only; may be stale).
 4. Review LA Data Viz's Tableau theme generator.
+
+## Tableau Cloud / Server / Public support for theme JSON (feathers-5ct.12)
+Checked 2026-10-01.
+- Tableau's own doc says only: "This feature is available only in Tableau Desktop 2025.1." It is silent on Cloud, Server, Public, web authoring and on publishing.
+- A search-engine summary claimed themes "carry over once published to Tableau Cloud and Server" and that themes "do not work with a Published Data Source in Tableau Cloud (as of December 17, 2025)". Neither the LA Data Viz newsletter nor the blog it cited says this, so both claims are UNVERIFIED and must not appear in guides.
+- Blog report (sarahpallett.com, Mar 2025): `worksheet-title` and `tooltip` font sizes did not apply from a hand-written theme; using Tableau's own export then editing worked. Our exporter writes both, so verify by hand.
+- Guide wording therefore says only: importing is done in Tableau Desktop 2025.1 or later.
+- Dialog: Format > Import Custom Theme..., then an "Apply Custom Theme" prompt with Override / Preserve (button labels per blog; Tableau's page gives no exact text).
+- Palettes: Edit Colors > pick palette > Assign Palette > OK; palettes load only at startup (restart required).

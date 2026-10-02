@@ -42,6 +42,17 @@ check("loads Playfair by default", (await color(1).inputValue()) === "#0A3746");
 check("8 categorical rows", (await page.locator(".swatch-row").count()) === 8);
 await page.screenshot({ path: path.join(SHOTS, "desktop-light.png"), fullPage: true });
 
+// 1b. guides: present, closed until needed, ordered by selected tool
+const guideTitles = async () => page.locator(".guide > summary").allTextContents();
+check("three guides render", (await page.locator(".guide").count()) === 3);
+check("guides start closed", (await page.locator(".guide[open]").count()) === 0);
+check("Power BI tool lists the Power BI guide first", (await guideTitles())[0] === "Import into Power BI Desktop", (await guideTitles()).join(" | "));
+check("which-files hint for Power BI", (await page.locator(".which-files").textContent()).includes("one file"));
+await page.getByRole("button", { name: "Tableau", exact: true }).click();
+check("Tableau tool lists Tableau guides first", (await guideTitles())[0].includes("Tableau") && (await guideTitles())[1].includes("Tableau"), (await guideTitles()).join(" | "));
+check("which-files hint for Tableau", (await page.locator(".which-files").textContent()).includes("both files"));
+await page.getByRole("button", { name: "Power BI", exact: true }).click();
+
 // 2. invalid hex is flagged, not committed, and reverts on blur
 await color(1).fill("#12");
 check("invalid hex sets aria-invalid", (await color(1).getAttribute("aria-invalid")) === "true");
@@ -97,8 +108,8 @@ check("line width 9 rejected", (await page.getByLabel("Width (1-5)").first().get
 await page.getByLabel("Start from").selectOption({ label: "Okabe-Ito (colorblind-safe)" });
 check("preset loads Okabe-Ito color 1", (await color(1).inputValue()) === "#E69F00");
 check("preset sets theme name", (await page.getByLabel("Name", { exact: true }).inputValue()).startsWith("Okabe-Ito"));
-check("filename follows slug", await page.getByText("okabe-ito-colorblind-safe.powerbi.json").isVisible());
-check("tps file is not named Preferences.tps", await page.getByText("feathers-okabe-ito-colorblind-safe.tps").isVisible());
+check("filename follows slug", await page.locator(".filename", { hasText: "okabe-ito-colorblind-safe.powerbi.json" }).isVisible());
+check("tps file is not named Preferences.tps", await page.locator(".filename", { hasText: "feathers-okabe-ito-colorblind-safe.tps" }).isVisible());
 
 await page.getByLabel("Width (1-5)").first().fill("3");
 
@@ -107,7 +118,7 @@ await page.getByLabel("Name", { exact: true }).fill("");
 check("empty name shows export error", await page.getByText("name must not be empty").first().isVisible());
 check("downloads disabled on error", await page.getByRole("button", { name: "Download" }).first().isDisabled());
 await page.getByLabel("Name", { exact: true }).fill("QA Theme #1");
-check("slug sanitizes punctuation", await page.getByText("qa-theme-1.powerbi.json").isVisible());
+check("slug sanitizes punctuation", await page.locator(".filename", { hasText: "qa-theme-1.powerbi.json" }).isVisible());
 
 // 12. real downloads, validated against the published schemas
 const dl = async (cardTitle) => {
@@ -131,6 +142,20 @@ const tps = await dl("Tableau palettes");
 check("tps filename", tps.name === "feathers-qa-theme-1.tps", tps.name);
 check("tps has 3 palette types", ["regular", "ordered-sequential", "ordered-diverging"].every((t) => tps.text.includes(`type="${t}"`)));
 check("tps escapes the # nothing odd and uses straight quotes", !/[\u201C\u201D]/.test(tps.text));
+
+// 12b. downloading opens the matching guide with the real filename
+check("download opens the tps guide", await page.locator(".guide", { hasText: "Add the palettes" }).evaluate((el) => el.open));
+const tpsGuide = await page.locator(".guide", { hasText: "Add the palettes" }).innerText();
+check("tps guide names the actual file", tpsGuide.includes("feathers-qa-theme-1.tps"));
+check("tps guide shows literal <preferences> text", tpsGuide.includes("<preferences>") && tpsGuide.includes("</preferences>"));
+check("tps guide mentions backup, restart, Assign Palette", /backup/i.test(tpsGuide) && /restart/i.test(tpsGuide) && tpsGuide.includes("Assign Palette"));
+const themeGuide = await page.locator(".guide", { hasText: "Import into Tableau Desktop" }).innerText();
+check("Tableau theme guide names menu path and file", themeGuide.includes("Format > Import Custom Theme") && themeGuide.includes("qa-theme-1.tableau.json"));
+check("no unreplaced {file} placeholders on the page", !(await page.locator("body").innerText()).includes("{file}"));
+await page.screenshot({ path: path.join(SHOTS, "guides.png"), fullPage: true });
+// open state survives edits (controls change -> export bar re-renders)
+await page.getByLabel("Name", { exact: true }).fill("QA Theme #1");
+check("open guides stay open after an edit", await page.locator(".guide", { hasText: "Add the palettes" }).evaluate((el) => el.open));
 
 // 13. copy XML
 await page.locator(".export-card", { hasText: "Tableau palettes" }).getByRole("button", { name: "Copy XML" }).click();

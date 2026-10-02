@@ -114,6 +114,16 @@ button.primary { background: var(--accent); color: var(--on-accent); border-colo
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .error { margin: 0; color: var(--error); font-size: 0.875rem; }
 .export-status { margin: 12px 0 0; min-height: 1.5em; color: var(--text-muted); font-size: 0.875rem; }
+.which-files { margin: -4px 0 12px; }
+.guides-title { margin-top: 24px; }
+.guides { display: grid; gap: 8px; }
+.guide { border: 1px solid var(--border); border-radius: var(--radius); }
+.guide summary { cursor: pointer; padding: 12px 16px; font-weight: 600; }
+.guide-body { padding: 0 16px 16px; max-width: 72ch; }
+.guide-body h4 { margin: 16px 0 4px; font-size: 0.9375rem; }
+.guide-body ol { margin: 8px 0; padding-left: 1.4em; display: grid; gap: 8px; }
+.guide-body dt { font-weight: 600; margin-top: 10px; }
+.guide-body dd { margin: 2px 0 0; color: var(--text-muted); }
 .code { margin: 0; padding: 12px; max-height: 320px; overflow: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-size: 0.8125rem; }
 
 @media (prefers-reduced-motion: no-preference) {
