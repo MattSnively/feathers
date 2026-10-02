@@ -507,7 +507,11 @@ dialog.drawer::backdrop { background: rgba(10, 12, 18, 0.55); }
 .ob-palette:hover { border-color: var(--border-strong); }
 .ob-palette[aria-pressed="true"]:hover { border-color: var(--ink); }
 .ob-strip { display: flex; height: 104px; overflow: hidden; border-radius: 14px; }
-.ob-strip span { flex: 1; }
+/* Each slice shears about the strip's vertical center, so neighbours still tile; the end slices overscan by half the
+   shear (52px * tan 14deg = 13px) so the clipped strip has no empty corners. */
+.ob-strip span { flex: 1; transform: skewX(-14deg); }
+.ob-strip span:first-child { margin-left: -14px; }
+.ob-strip span:last-child { margin-right: -14px; }
 .ob-card-foot { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 0 6px; }
 .ob-card-foot strong { display: block; font-size: 18px; font-weight: 800; }
 .ob-card-foot p { margin: 4px 0 0; font-size: 14px; color: var(--ink-2); }
