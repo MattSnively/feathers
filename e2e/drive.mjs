@@ -65,9 +65,17 @@ const frame = await box(".pv-frame");
 check("app fills a 1920px viewport", Math.abs(app.width - 1920) < 2 && Math.abs(app.height - 1080) < 2, JSON.stringify(app));
 check("stage takes the remaining width (>1400px)", stage.width > 1400, `stage ${stage.width}`);
 check("panel is a compact fixed column (300-400px)", panel.width >= 300 && panel.width <= 400, `panel ${panel.width}`);
-check("report fills the stage (>85% of its width)", frame.width > stage.width * 0.85, `frame ${frame.width} / stage ${stage.width}`);
+check("report uses most of the stage width (>75%; Fit is also limited by height)", frame.width > stage.width * 0.75, `frame ${frame.width} / stage ${stage.width}`);
 check("no horizontal page scroll at 1920", (await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)) <= 0);
 check("page itself doesn't scroll (panel and stage do)", (await page.evaluate(() => document.documentElement.scrollHeight - innerHeight)) <= 1);
+const noScroll = async () => (await page.evaluate(() => { const sc = document.querySelector(".stage-scroll"); return sc.scrollHeight - sc.clientHeight; })) <= 2;
+check("Fit shows the whole Power BI report without scrolling the stage", await noScroll());
+for (const [label, name] of [["column", "Sample column chart"], ["line", "Sample line chart"], ["scatter", "Sample scatter plot"], ["share bar", "Sample stacked share bar"]]) {
+  check(`Power BI suite has a ${label} chart`, (await page.locator(`.pv-canvas svg[aria-label="${name}"]`).count()) === 1);
+}
+check("Power BI suite has 4 KPI cards and a table", (await page.locator(".pv-kpis > .pv-card").count()) === 4 && (await page.locator(".pv-table tbody tr").count()) === 4);
+check("Power BI line chart draws 3 series", (await page.locator('svg[aria-label="Sample line chart"] polyline[stroke-width="2.5"]').count()) === 3);
+check("Power BI scatter draws 18 points", (await page.locator('svg[aria-label="Sample scatter plot"] circle').count()) === 18);
 await page.screenshot({ path: path.join(SHOTS, "e2e-1920.png") });
 
 // =============================================================================================
@@ -146,10 +154,17 @@ await tab("text");
 await page.locator('svg rect[aria-label="Edit color 2"]').first().click();
 check("clicking a bar opens Colors, selects that swatch", (await activeTab()) === "colors" && (await chip(1).getAttribute("aria-pressed")) === "true");
 check("...and focuses its hex field", (await focusKey()) === "cat-1", String(await focusKey()));
+await tab("text");
+await page.locator('svg[aria-label="Sample scatter plot"] circle').nth(6).click();
+check("clicking a scatter point jumps to its group color", (await activeTab()) === "colors" && (await focusKey()) === "cat-1", String(await focusKey()));
+await tab("text");
+await page.locator('svg[aria-label="Sample line chart"] g.editable[aria-label="Edit color 3"] circle').first().click();
+check("clicking a line jumps to its series color", (await activeTab()) === "colors" && (await focusKey()) === "cat-2", String(await focusKey()));
+
 await page.locator(".pv-card").first().click({ position: { x: 3, y: 3 } });
 check("clicking a chart area opens Canvas and focuses it", (await activeTab()) === "canvas" && (await focusKey()) === "bg-container", `${await activeTab()} ${await focusKey()}`);
 check("preview announces where it jumped", (await page.locator(".pv-status").innerText()).includes("chart area background"));
-await page.locator('[aria-label="Edit gridlines"]').focus();
+await page.locator('[aria-label="Edit gridlines"]').first().focus();
 await page.keyboard.press("Enter");
 check("keyboard Enter on gridlines opens Lines", (await activeTab()) === "lines" && (await focusKey()) === "gridline-color");
 await page.locator('.pv-title[aria-label="Edit title font"]').focus();
@@ -211,6 +226,12 @@ await setMode("Advanced");
 // =============================================================================================
 await page.getByRole("button", { name: "Tableau", exact: true }).click();
 check("Tableau preview renders with a zero line", (await page.locator(".pv-tab").count()) === 1 && (await page.locator('[aria-label="Edit zero line"]').count()) >= 1);
+check("Fit shows the whole Tableau dashboard without scrolling", await noScroll());
+check("Tableau suite has KPI cards (4), bar, line, scatter and a table", (await page.locator(".pv-tab .pv-kpis > .pv-card").count()) === 4 && (await page.locator('.pv-tab svg[aria-label="Sample bar chart colored by category"]').count()) === 1 && (await page.locator('.pv-tab svg[aria-label="Sample line chart in the theme mark color"]').count()) === 1 && (await page.locator('.pv-tab svg[aria-label="Sample scatter plot colored by category"]').count()) === 1 && (await page.locator(".pv-tab .pv-table tbody tr").count()) === 5);
+check("Tableau scatter has 15 points and a zero line on each axis", (await page.locator('.pv-tab svg[aria-label^="Sample scatter plot"] circle').count()) === 15 && (await page.locator('.pv-tab svg[aria-label^="Sample scatter plot"] [aria-label="Edit zero line"] line:not([stroke="transparent"])').count()) === 2);
+await page.locator('.pv-tab svg[aria-label^="Sample scatter plot"] circle').nth(3).click();
+check("clicking a Tableau scatter point jumps to its category color", (await activeTab()) === "colors" && (await focusKey()) === "cat-1", String(await focusKey()));
+await tab("text");
 check("schema chip follows the tool", (await page.locator(".schema-chip").innerText()).includes("Tableau theme"));
 await tab("text");
 check("Tableau fonts list", (await page.locator('[data-key="font-body"] option').allTextContents()).includes("Tableau Book"));
@@ -231,6 +252,7 @@ const badge1 = Number(await page.locator(".rail-badge").innerText());
 const summary1 = await page.locator(".a11y-summary").innerText();
 check("Checks badge matches the findings count", summary1.startsWith(`${badge1} thing`), `${badge1} vs ${summary1}`);
 check("Checks tab lists Playfair's real problems", (await panelText()).includes("Muted text is hard to read") && (await panelText()).includes("look alike"));
+check("Checks cards have a uniform border (no left accent)", await page.locator(".finding").first().evaluate((e) => { const c = getComputedStyle(e); return c.borderLeftWidth === c.borderTopWidth && c.borderLeftColor === c.borderTopColor; }));
 check("simulated palettes for 3 vision types", (await page.locator(".a11y .chips").count()) === 3);
 await page.locator("#preset").selectOption({ label: "Okabe-Ito (colorblind-safe)" });
 check("preset sets the name", (await page.locator("#theme-name").inputValue()).startsWith("Okabe-Ito"));

@@ -14,6 +14,9 @@ const CAPTION: Record<"powerbi" | "tableau", string> = {
 };
 
 const STAGE_PADDING = 32;
+/** Space kept below the report for its caption and status line. */
+const CAPTION_ROOM = 170;
+const MIN_FIT = 0.5;
 const WIDE = "(min-width: 900px)";
 
 /**
@@ -92,7 +95,10 @@ export function buildPreview(store: Store, reveal: (key: string) => void): HTMLE
 
   const toolbar = h("div", { class: "stage-toolbar" }, zoomSelect, hintsBtn);
 
-  /** Scales the report to the stage on wide screens; on narrow ones it reflows at full width instead. */
+  /**
+   * Scales the report to the stage on wide screens; on narrow ones it reflows at full width instead.
+   * "Fit" shows the whole report at once, so it is limited by the stage's height as well as its width.
+   */
   function applyZoom() {
     const wide = window.matchMedia(WIDE).matches;
     frame.classList.toggle("fixed", wide);
@@ -101,7 +107,13 @@ export function buildPreview(store: Store, reveal: (key: string) => void): HTMLE
       (zoomSelect.options[0] as HTMLOptionElement).textContent = "Fit";
       return;
     }
-    const fit = fitZoom(scroller.clientWidth - 2 * STAGE_PADDING, DESIGN_WIDTH);
+    // Measure the report at 100% to learn its natural height.
+    frame.style.setProperty("zoom", "1");
+    const naturalHeight = frame.offsetHeight;
+    const availableHeight = scroller.clientHeight - CAPTION_ROOM;
+    const byWidth = fitZoom(scroller.clientWidth - 2 * STAGE_PADDING, DESIGN_WIDTH);
+    const byHeight = naturalHeight > 0 ? availableHeight / naturalHeight : byWidth;
+    const fit = Math.min(byWidth, Math.max(byHeight, MIN_FIT));
     const z = zoomChoice === "fit" ? fit : zoomChoice;
     frame.style.setProperty("zoom", String(z));
     (zoomSelect.options[0] as HTMLOptionElement).textContent = `Fit (${Math.round(fit * 100)}%)`;
@@ -111,6 +123,7 @@ export function buildPreview(store: Store, reveal: (key: string) => void): HTMLE
     const { theme, tool } = store.get();
     frame.replaceChildren(tool === "powerbi" ? powerBiPreview(theme, edit) : tableauPreview(theme, edit));
     caption.textContent = CAPTION[tool];
+    applyZoom();
   }
 
   root.append(h("h2", { class: "visually-hidden" }, "Preview"), toolbar, scroller);

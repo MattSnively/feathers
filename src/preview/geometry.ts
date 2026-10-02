@@ -22,6 +22,13 @@ export function scaleY(plot: Plot, ticks: number[]): (value: number) => number {
   return (v) => plot.top + (1 - (v - min) / (max - min)) * plot.height;
 }
 
+/** Maps a data value to an x pixel; `ticks` gives the axis domain (first = left, last = right). */
+export function scaleX(plot: Plot, ticks: number[]): (value: number) => number {
+  const min = ticks[0]!;
+  const max = ticks[ticks.length - 1]!;
+  return (v) => plot.left + ((v - min) / (max - min)) * plot.width;
+}
+
 /**
  * Grouped columns: one group per category, one bar per series. Bars rise from the zero line
  * (or the bottom edge when the domain doesn't include zero) and hang below it when negative.

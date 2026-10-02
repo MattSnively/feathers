@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { layoutBars, scaleY, type Plot } from "../src/preview/geometry";
+import { layoutBars, scaleX, scaleY, type Plot } from "../src/preview/geometry";
 import { calloutPx, fontStyle, lineAttrs, px } from "../src/preview/style";
 
 describe("fontStyle", () => {
@@ -63,6 +63,19 @@ describe("chart geometry", () => {
     expect(y(0)).toBe(110);
     expect(y(100)).toBe(10);
     expect(y(50)).toBe(60);
+  });
+
+  it("maps x domain ends to the plot's left and right edges", () => {
+    const x = scaleX(plot, [0, 50, 100]);
+    expect(x(0)).toBe(40);
+    expect(x(100)).toBe(240);
+    expect(x(25)).toBe(90);
+  });
+
+  it("places negative x values left of zero when the domain spans it", () => {
+    const x = scaleX(plot, [-50, 0, 50]);
+    expect(x(0)).toBe(140);
+    expect(x(-50)).toBe(40);
   });
 
   it("stands positive bars on the baseline with proportional heights", () => {
