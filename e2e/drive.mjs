@@ -53,6 +53,29 @@ check("Tableau tool lists Tableau guides first", (await guideTitles())[0].includ
 check("which-files hint for Tableau", (await page.locator(".which-files").textContent()).includes("both files"));
 await page.getByRole("button", { name: "Power BI", exact: true }).click();
 
+// 1c. accessibility panel: findings, live updates, simulations
+const a11y = () => page.locator(".a11y").innerText();
+let panel = await a11y();
+check("a11y panel flags Playfair muted text", panel.includes("Muted text is hard to read"));
+check("a11y panel flags the brand's similar blues", panel.includes("color 1 and color 7"));
+check("a11y panel flags red/green status under protanopia", panel.includes("Status colors that look alike with protanopia"));
+check("a11y summary counts findings", /\d+ things? to check/.test(await page.locator(".a11y-summary").innerText()));
+check("simulation strips for 3 vision types", (await page.locator(".a11y .chips").count()) === 3);
+check("simulated chips are labelled for screen readers", (await page.locator('.a11y .chip[aria-label*="deuteranopia"]').count()) === 8);
+check("disclaimer says checks can't certify", panel.includes("can't certify"));
+await color(7).fill("#CC79A7");
+check("findings update live (similar-blues pair resolves)", !(await a11y()).includes("color 1 and color 7"));
+check("editing a color keeps focus (panel isn't a focus trap)", (await focusKey()) === "cat-6");
+await color(7).fill("#03222C");
+check("restoring the color brings the finding back", (await a11y()).includes("color 1 and color 7"));
+await page.getByLabel("Start from").selectOption({ label: "Okabe-Ito (colorblind-safe)" });
+panel = await a11y();
+check("Okabe-Ito shows no color-confusion findings", !panel.includes("look alike"));
+check("Okabe-Ito still reports faint yellow honestly", panel.includes("faint on the chart background") && panel.includes("color 4"));
+await page.screenshot({ path: path.join(SHOTS, "a11y-okabe.png"), fullPage: false });
+await page.getByLabel("Start from").selectOption({ label: "Playfair Data brand" });
+check("switching back restores Playfair findings", (await a11y()).includes("Muted text is hard to read"));
+
 // 2. invalid hex is flagged, not committed, and reverts on blur
 await color(1).fill("#12");
 check("invalid hex sets aria-invalid", (await color(1).getAttribute("aria-invalid")) === "true");

@@ -2,6 +2,7 @@ import type { Theme } from "../model/theme";
 import { blank } from "../presets/blank";
 import { okabeIto, playfair, tolMuted } from "../presets";
 import type { Store, Tool } from "../state/store";
+import { buildA11yPanel } from "./a11yPanel";
 import { buildControls } from "./controls";
 import { h } from "./dom";
 import { buildExportBar } from "./exportBar";
@@ -78,7 +79,8 @@ export function mountApp(root: HTMLElement, store: Store): void {
       h("section", { class: "preview", "aria-labelledby": "preview-title" },
         h("h2", { id: "preview-title" }, "Preview"),
         paletteStrips(store),
-        h("p", { class: "hint" }, "A live report preview is coming. For now, check your palette here."))),
+        h("p", { class: "hint" }, "A live report preview is coming. For now, check your palette here."),
+        buildA11yPanel(store))),
     buildExportBar(store),
   );
 }

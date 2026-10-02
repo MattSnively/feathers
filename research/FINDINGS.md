@@ -65,3 +65,11 @@ Checked 2026-10-01.
 - Guide wording therefore says only: importing is done in Tableau Desktop 2025.1 or later.
 - Dialog: Format > Import Custom Theme..., then an "Apply Custom Theme" prompt with Override / Preserve (button labels per blog; Tableau's page gives no exact text).
 - Palettes: Edit Colors > pick palette > Assign Palette > OK; palettes load only at startup (restart required).
+
+## Accessibility checks (feathers-5ct.7)
+Implemented in `src/a11y/`. Sources and limits:
+- **Simulation:** Machado, Oliveira & Fernandes (2009) matrices at severity 1.0 for protanopia, deuteranopia and tritanopia, applied in linear RGB (values from the authors' page; DaltonLens review confirms the linear-RGB usage). Accurate for protan/deutan, only approximate for tritan; the UI says so.
+- **Color difference:** CIEDE2000, verified against two published Sharma, Wu & Dalal (2005) test pairs (2.0425 and 1.0000).
+- **Thresholds (heuristic, not a standard):** pairs below CIEDE2000 10 are flagged as hard to tell apart; text needs WCAG 4.5:1; chart marks need 3:1 (WCAG 1.4.11).
+- **Results on presets:** Okabe-Ito and Tol Muted have no confusable pairs at this threshold, but both have data colors that are faint on a white chart area (Okabe yellow #F0E442 is 1.3:1). Playfair: brand red/green collapse under PROTANOPIA (not deuteranopia), Blue Wing and Dark Blue Wing look alike even with typical vision (difference 6.7), muted text is 3.2:1, and Orange Feather / Dark Yellow are faint on white.
+- The checks are automated and cannot certify accessibility; the UI states this.
