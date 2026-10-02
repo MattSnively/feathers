@@ -10,7 +10,16 @@ type PaletteTab = "categorical" | "sequential" | "diverging";
 const MAX_CATEGORICAL = 20;
 const LINE_STYLES: readonly LineStyle[] = ["solid", "dashed", "dotted"];
 
-export function buildControls(store: Store): HTMLElement {
+/** Which panel holds the control a data-key belongs to, so clicking the preview can open it first. */
+function panelFor(key: string): string | null {
+  if (/^(cat|status|text|sequential|diverging)-/.test(key)) return "colors";
+  if (/^(font|size)-/.test(key)) return "fonts";
+  if (/^(gridline|zeroline)/.test(key)) return "lines";
+  if (key.startsWith("bg-")) return "backgrounds";
+  return null;
+}
+
+export function buildControls(store: Store): { element: HTMLElement; reveal: (key: string) => void } {
   const root = h("div", { class: "controls" });
   let tab: PaletteTab = "categorical";
   let focusKey: string | null = null;
@@ -141,12 +150,12 @@ export function buildControls(store: Store): HTMLElement {
     const list = tool === "powerbi" ? POWER_BI_FONTS : TABLEAU_FONTS;
     return panel("fonts", `Fonts (${tool === "powerbi" ? "Power BI" : "Tableau"})`,
       hint("Only fonts that ship with the tool, so what you see is what imports."),
-      selectField("Body font", list, theme.fonts[key].body, (v) => store.updateTheme((t) => { t.fonts[key].body = v; })),
-      selectField("Title font", list, theme.fonts[key].title, (v) => store.updateTheme((t) => { t.fonts[key].title = v; })),
-      numberField("Body size (pt)", theme.sizes.body, { min: 1, max: 99 }, (n) => store.updateTheme((t) => { t.sizes.body = n; })),
-      numberField("Title size (pt)", theme.sizes.title, { min: 1, max: 99 }, (n) => store.updateTheme((t) => { t.sizes.title = n; })),
+      selectField("Body font", list, theme.fonts[key].body, (v) => store.updateTheme((t) => { t.fonts[key].body = v; }), { key: "font-body" }),
+      selectField("Title font", list, theme.fonts[key].title, (v) => store.updateTheme((t) => { t.fonts[key].title = v; }), { key: "font-title" }),
+      numberField("Body size (pt)", theme.sizes.body, { min: 1, max: 99 }, (n) => store.updateTheme((t) => { t.sizes.body = n; }), { key: "size-body" }),
+      numberField("Title size (pt)", theme.sizes.title, { min: 1, max: 99 }, (n) => store.updateTheme((t) => { t.sizes.title = n; }), { key: "size-title" }),
       tool === "powerbi"
-        ? numberField("Card value size (pt)", theme.sizes.callout, { min: 1, max: 99 }, (n) => store.updateTheme((t) => { t.sizes.callout = n; }))
+        ? numberField("Card value size (pt)", theme.sizes.callout, { min: 1, max: 99 }, (n) => store.updateTheme((t) => { t.sizes.callout = n; }), { key: "size-callout" })
         : null,
     );
   };
@@ -197,9 +206,22 @@ export function buildControls(store: Store): HTMLElement {
     rebuild(root, () => [namePanel(), colorsPanel(), fontsPanel(), linesPanel(), backgroundsPanel()], key);
   }
 
+  /** Opens the panel for `key`, switches palette tab if needed, and moves focus to that control. */
+  function reveal(key: string) {
+    const panelId = panelFor(key);
+    if (!panelId) return;
+    collapsed.delete(panelId);
+    if (key.startsWith("cat-")) tab = "categorical";
+    else if (key.startsWith("sequential-")) tab = "sequential";
+    else if (key.startsWith("diverging-")) tab = "diverging";
+    focusKey = key;
+    render();
+    root.querySelector<HTMLElement>(`[data-key="${CSS.escape(key)}"]`)?.scrollIntoView({ block: "center" });
+  }
+
   store.subscribe((_state, kind) => {
     if (kind === "structure") render();
   });
   render();
-  return root;
+  return { element: root, reveal };
 }

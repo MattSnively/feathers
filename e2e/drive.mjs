@@ -76,6 +76,66 @@ await page.screenshot({ path: path.join(SHOTS, "a11y-okabe.png"), fullPage: fals
 await page.getByLabel("Start from").selectOption({ label: "Playfair Data brand" });
 check("switching back restores Playfair findings", (await a11y()).includes("Muted text is hard to read"));
 
+// 1d. report preview + click-to-edit
+const open = (name) => page.locator("details.panel", { hasText: name }).evaluate((el) => el.open);
+const toggle = (name) => page.locator("details.panel", { hasText: name }).locator("summary").first().click();
+check("Power BI preview renders", (await page.locator(".pv-canvas .pv-page").count()) === 1);
+const editables = await page.locator(".report-preview .editable").count();
+check("preview has many click-to-edit parts", editables > 20, `count ${editables}`);
+check("every editable is an accessible button", await page.locator(".report-preview .editable").evaluateAll((els) => els.every((e) => e.getAttribute("role") === "button" && e.getAttribute("tabindex") === "0" && /^Edit /.test(e.getAttribute("aria-label") ?? ""))));
+check("gridlines exist in the preview (dotted, even if faint)", (await page.locator('[aria-label="Edit gridlines"] line[stroke-dasharray]').count()) > 0);
+
+// click a card -> opens collapsed Backgrounds panel and focuses the chart-area color
+await toggle("Backgrounds");
+check("Backgrounds panel collapsed for the test", !(await open("Backgrounds")));
+await page.locator(".pv-card").first().click({ position: { x: 3, y: 3 } });
+check("clicking a chart area opens its panel", await open("Backgrounds"));
+check("...and focuses the chart-area color", (await focusKey()) === "bg-container", String(await focusKey()));
+check("preview announces where it jumped", (await page.locator(".pv-status").innerText()).includes("chart area background"));
+
+// click a bar while on the Diverging tab -> returns to Categorical and focuses that color
+await page.getByRole("button", { name: "Diverging", exact: true }).click();
+await page.locator('svg rect[aria-label="Edit color 2"]').first().click();
+check("clicking a bar jumps to that data color", (await focusKey()) === "cat-1", String(await focusKey()));
+check("...switching back to the categorical tab", (await color(2).count()) === 1);
+
+// keyboard: Enter on gridlines / title
+await page.locator('[aria-label="Edit gridlines"]').focus();
+await page.keyboard.press("Enter");
+check("keyboard Enter on gridlines jumps to gridline color", (await focusKey()) === "gridline-color", String(await focusKey()));
+await page.locator('.pv-title[aria-label="Edit title font"]').focus();
+await page.keyboard.press("Enter");
+check("keyboard Enter on the title jumps to the title font", (await focusKey()) === "font-title", String(await focusKey()));
+
+// the preview redraws live
+await color(1).fill("#112233");
+check("editing a color redraws the bars", (await page.locator('svg rect[aria-label="Edit color 1"]').first().getAttribute("fill")) === "#112233");
+await page.getByLabel("Title font", { exact: true }).selectOption("Verdana");
+check("title font change reaches the preview", (await page.locator(".pv-title").first().evaluate((e) => getComputedStyle(e).fontFamily)).includes("Verdana"));
+await page.getByLabel("Card value size (pt)").fill("20");
+check("card value size reaches the preview", Math.abs(parseFloat(await page.locator(".pv-kpi").first().evaluate((e) => getComputedStyle(e).fontSize)) - 26.67) < 0.1);
+await page.getByLabel("Canvas (Power BI)", { exact: true }).fill("#102030");
+check("canvas color reaches the preview", (await page.locator(".pv-canvas").evaluate((e) => getComputedStyle(e).backgroundColor)) === "rgb(16, 32, 48)");
+const gridCheck = page.locator("details.panel", { hasText: "Lines" }).getByLabel("Show").first();
+await gridCheck.uncheck();
+check("hiding gridlines removes them from the preview", (await page.locator('[aria-label="Edit gridlines"]').count()) === 0);
+await gridCheck.check();
+await page.locator("details.panel", { hasText: "Lines" }).getByLabel("Style").first().selectOption("solid");
+check("solid gridlines draw without a dash array", (await page.locator('[aria-label="Edit gridlines"] line[stroke-dasharray]').count()) === 0);
+
+// Tableau preview
+await page.getByRole("button", { name: "Tableau", exact: true }).click();
+check("Tableau preview renders", (await page.locator(".pv-tab").count()) === 1);
+check("Tableau preview has a zero line", (await page.locator('[aria-label="Edit zero line"]').count()) >= 1);
+await page.locator('svg rect[aria-label="Edit color 3"]').first().click();
+check("clicking a Tableau bar jumps to its color", (await focusKey()) === "cat-2", String(await focusKey()));
+await page.locator('.pv-tab .pv-card').first().click({ position: { x: 3, y: 3 } });
+check("Tableau view background jumps to the chart-area color", (await focusKey()) === "bg-container", String(await focusKey()));
+await page.screenshot({ path: path.join(SHOTS, "preview-tableau-edit.png"), fullPage: false });
+await page.getByRole("button", { name: "Power BI", exact: true }).click();
+await page.getByLabel("Start from").selectOption({ label: "Playfair Data brand" });
+check("reset for the remaining checks", (await color(1).inputValue()) === "#0A3746");
+
 // 2. invalid hex is flagged, not committed, and reverts on blur
 await color(1).fill("#12");
 check("invalid hex sets aria-invalid", (await color(1).getAttribute("aria-invalid")) === "true");

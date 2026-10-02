@@ -6,6 +6,7 @@ import { buildA11yPanel } from "./a11yPanel";
 import { buildControls } from "./controls";
 import { h } from "./dom";
 import { buildExportBar } from "./exportBar";
+import { buildPreview } from "./preview";
 
 const STARTING_POINTS: [string, Theme][] = [
   ["Playfair Data brand", playfair],
@@ -68,6 +69,7 @@ function paletteStrips(store: Store): HTMLElement {
 }
 
 export function mountApp(root: HTMLElement, store: Store): void {
+  const controls = buildControls(store);
   root.replaceChildren(
     h("header", { class: "top" },
       h("div", { class: "brand" },
@@ -75,11 +77,11 @@ export function mountApp(root: HTMLElement, store: Store): void {
         h("p", {}, "One theme for Power BI and Tableau: colors, fonts, gridlines and backgrounds.")),
       h("div", { class: "top-controls" }, toolToggle(store), presetPicker(store))),
     h("main", { class: "workspace" },
-      buildControls(store),
+      controls.element,
       h("section", { class: "preview", "aria-labelledby": "preview-title" },
         h("h2", { id: "preview-title" }, "Preview"),
+        buildPreview(store, controls.reveal),
         paletteStrips(store),
-        h("p", { class: "hint" }, "A live report preview is coming. For now, check your palette here."),
         buildA11yPanel(store))),
     buildExportBar(store),
   );

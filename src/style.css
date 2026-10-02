@@ -50,7 +50,8 @@ h3 { font-size: 1rem; margin: 16px 0 8px; }
 .workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 @media (min-width: 900px) {
   .workspace { grid-template-columns: minmax(340px, 440px) minmax(0, 1fr); align-items: start; }
-  .preview { position: sticky; top: 16px; }
+  /* Tall content scrolls inside the pinned column, so the preview stays beside the controls being edited. */
+  .preview { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; }
 }
 
 .panel, .preview, .export-bar {
@@ -138,3 +139,31 @@ button.primary { background: var(--accent); color: var(--on-accent); border-colo
 @media (prefers-reduced-motion: no-preference) {
   button, input, select { transition: border-color 0.15s, background-color 0.15s; }
 }
+
+/* Report preview. Colors, fonts and sizes come from the theme via inline styles. */
+.report-preview h3 { margin-top: 0; }
+.pv-canvas { padding: 16px; border-radius: var(--radius); border: 1px solid var(--border); }
+.pv-page { padding: 14px; display: grid; gap: 12px; }
+.pv-title { margin: 0; font-weight: inherit; }
+.pv-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.pv-row { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.pv-card { padding: 10px; border-radius: 2px; min-width: 0; }
+.pv-vtitle { margin-bottom: 6px; }
+.pv-kpi { line-height: 1.15; }
+.pv-chart { display: block; max-width: 100%; height: auto; }
+.pv-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; }
+.pv-legend.vertical { flex-direction: column; margin-top: 0; }
+.pv-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.pv-swatch { width: 12px; height: 12px; display: inline-block; }
+.pv-spacer { height: 12px; }
+.pv-table { width: 100%; border-collapse: collapse; text-align: left; }
+.pv-table th, .pv-table td { padding: 4px 6px; }
+.pv-tab { padding: 14px; display: grid; gap: 12px; background: #fff; border: 1px solid #d9d9d9; border-radius: var(--radius); }
+.pv-with-legend { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+.pv-with-legend .pv-chart { flex: 1 1 200px; }
+.pv-tooltip { display: inline-block; padding: 6px 10px; background: #fff; border: 1px solid #c8c6c4; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18); }
+.pv-status { margin: 0; min-height: 1.4em; font-size: 0.875rem; color: var(--text-muted); }
+.editable { cursor: pointer; }
+.editable:hover { outline: 2px dashed var(--focus); outline-offset: 1px; }
+svg .editable:hover { opacity: 0.8; outline: none; }
+.editable:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }

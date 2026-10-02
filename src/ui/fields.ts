@@ -76,13 +76,14 @@ export function selectField(
   options: readonly string[],
   value: string,
   onChange: (value: string) => void,
+  opts: { key?: string } = {},
 ): HTMLElement {
   const id = uid("select");
   // A restored theme may name a font that has since left the curated list; keep it selectable.
   const all = options.includes(value) ? options : [value, ...options];
   const select = h(
     "select",
-    { id, onchange: () => onChange(select.value) },
+    { id, "data-key": opts.key, onchange: () => onChange(select.value) },
     ...all.map((o) => h("option", { value: o, selected: o === value }, o)),
   );
   return h("div", { class: "field" }, h("label", { htmlFor: id }, label), select);
@@ -93,10 +94,11 @@ export function numberField(
   value: number,
   range: { min: number; max: number },
   onCommit: (n: number) => void,
+  opts: { key?: string } = {},
 ): HTMLElement {
   const id = uid("num");
   const msg = h("span", { class: "field-msg", role: "alert" });
-  const input = h("input", { id, type: "number", value: String(value), min: range.min, max: range.max, step: 1 });
+  const input = h("input", { id, type: "number", value: String(value), min: range.min, max: range.max, step: 1, "data-key": opts.key });
   input.addEventListener("input", () => {
     const n = Number(input.value);
     if (Number.isInteger(n) && n >= range.min && n <= range.max) {
