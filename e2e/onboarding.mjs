@@ -46,7 +46,7 @@ const activeTag = () => page.evaluate(() => document.activeElement?.tagName);
 const nextBtn = () => page.getByRole("button", { name: "Continue" });
 
 check("first visit shows the flow", await ob.isVisible());
-check("heading is 'Start with your colors' and has focus", (await h1()) === "Start with your colors" && (await activeTag()) === "H1");
+check("heading is 'Build your data viz theme' and has focus", (await h1()) === "Build your data viz theme" && (await activeTag()) === "H1");
 check("three steps, first is current", (await page.locator(".ob-step").count()) === 3 && (await page.locator('.ob-step[aria-current="step"]').innerText()).includes("Colors"));
 check("the editor behind the flow is inert", await page.locator(".app").evaluate((e) => e.inert === true));
 check("Playfair is preselected, own colors is not", (await palettePressed("playfair")) === "true" && !(await page.locator(".ob-own.is-selected").count()));
@@ -118,7 +118,7 @@ await page.waitForFunction(() => /Verdana/.test(getComputedStyle(document.queryS
 check("the Power BI preview switches font", true);
 await page.screenshot({ path: path.join(SHOTS, "ob-2.png") });
 await page.locator(".ob-footer").getByRole("button", { name: "Back" }).click();
-check("Back returns to colors and keeps the choice", (await h1()) === "Start with your colors" && (await palettePressed("tol")) === "true");
+check("Back returns to colors and keeps the choice", (await h1()) === "Build your data viz theme" && (await palettePressed("tol")) === "true");
 await page.locator(".ob-step", { hasText: "Start" }).click();
 check("step pills navigate directly", (await h1()) === "Name your theme");
 
@@ -149,7 +149,7 @@ check("reload goes straight to the editor", (await page.locator(".onboard").coun
 const savedState = await page.evaluate(() => localStorage.getItem("feathers.state.v1"));
 
 await page.getByRole("button", { name: "New theme" }).click();
-check("New theme reopens the flow", await page.locator(".onboard").isVisible() && (await h1()) === "Start with your colors");
+check("New theme reopens the flow", await page.locator(".onboard").isVisible() && (await h1()) === "Build your data viz theme");
 check("...starting from the current theme (9 Tol colors)", (await tiles().count()) === 9 && (await palettePressed("tol")) === "true");
 await page.getByRole("button", { name: "Skip for now" }).click();
 check("Skip closes it without changing anything", (await page.locator(".onboard").count()) === 0 && (await page.locator("#theme-name").inputValue()) === "My Brand Theme");

@@ -28,7 +28,7 @@ const PALETTES = [
 const STEPS = ["Colors", "Fonts", "Start"] as const;
 
 const HEADINGS: [string, string][] = [
-  ["Start with your colors", "Bring your brand's own colors, or start from a palette. You can change any color later."],
+  ["Build your data viz theme", "Bring your brand's own colors, or start from a palette. You can change any color later."],
   ["Pick a font", "Only fonts that ship with each tool, so what you see is what imports. You can change them later."],
   ["Name your theme", "This names your downloaded files. You can rename it any time."],
 ];
