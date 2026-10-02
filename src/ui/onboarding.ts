@@ -1,6 +1,6 @@
 import { contrastRatio } from "../a11y/color";
 import { EXPORTS, slugify } from "../export/files";
-import { POWER_BI_FONTS, TABLEAU_FONTS } from "../model/fonts";
+import { ALL_FONTS, applyFont, currentFont, fontNotice, fontSupport } from "../model/fonts";
 import { parseHexList } from "../model/hexlist";
 import { importPowerBiTheme } from "../model/importPowerBi";
 import { deriveRamps } from "../model/ramps";
@@ -28,7 +28,7 @@ const STEP_COUNT = 3;
 
 const HEADINGS: [string, string][] = [
   ["Customize your colors and fonts before you even start your dashboard.", "Import a custom .json file directly into Tableau or Power BI with Feathers"],
-  ["Pick a font", "Only fonts that ship with each tool, so what you see is what imports. You can change them later."],
+  ["Pick a font", "Choose one font. We'll tell you whether it works in Power BI, Tableau or both. You can change it later."],
   ["Name your theme", "This names your downloaded files. You can rename it any time."],
 ];
 
@@ -67,6 +67,8 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
   const draft: Theme = structuredClone(initial);
   let source = sourceOf(initial);
   let step = 0;
+  // Tracked apart from the theme: picking Tableau's default font leaves the theme looking untouched.
+  let chosenFont = currentFont(draft.fonts);
   // Where the name came from decides whether a palette choice may rename the theme: only typed names are sticky.
   let nameSource: "default" | "import" | "typed" = "default";
 
@@ -83,12 +85,10 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
     // Decorative: the same choices are all available as text on the right.
     h("div", { "aria-hidden": "true" }, clip));
 
-  // The dashboard has one font slot, so it shows whichever tool's font was picked last.
-  let previewFontTool: "powerBi" | "tableau" = "powerBi";
-
   function renderPreview() {
+    // Show the font that was picked even when Power BI itself would fall back, so the choice is always visible.
     const shown = structuredClone(draft);
-    if (previewFontTool === "tableau") shown.fonts.powerBi = shown.fonts.tableau;
+    shown.fonts.powerBi = { body: chosenFont, title: chosenFont };
     frame.replaceChildren(powerBiPreview(shown, noEdit));
   }
   let queued = false;
@@ -190,6 +190,7 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
         file.value = "";
         if (!result.ok) return say("error", result.error);
         Object.assign(draft, structuredClone(result.theme));
+        chosenFont = currentFont(draft.fonts);
         nameSource = "import";
         paste.value = "";
         renderTiles();
@@ -235,29 +236,37 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
   // ---- Step 2: fonts --------------------------------------------------------------------------
 
   function fontsStep(): HTMLElement[] {
-    const group = (title: string, tool: "powerBi" | "tableau", list: readonly string[]) => {
-      const buttons = list.map((name) => {
-        const st = fontStyle(name);
-        const b = h("button", {
-          type: "button",
-          class: "ob-font",
-          "aria-pressed": String(draft.fonts[tool].body === name),
-          style: `font-family:${st.family};font-weight:${st.weight}`,
-          onclick: () => {
-            draft.fonts[tool].body = name;
-            draft.fonts[tool].title = name;
-            previewFontTool = tool;
-            buttons.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-            schedulePreview();
-          },
-        }, h("span", { class: "ob-font-aa" }, "Aa"), h("span", { class: "ob-font-name" }, name));
-        return b;
-      });
-      return h("section", {}, h("h2", { class: "ob-sub" }, title), h("div", { class: "ob-fonts" }, ...buttons));
+    const notice = h("p", { class: "ob-font-notice", role: "status" });
+    const showNotice = (name: string) => {
+      const n = fontNotice(name);
+      notice.className = `ob-font-notice ${n.kind}`;
+      notice.replaceChildren(icon(n.kind === "both" ? "check" : "info", 18), n.text);
     };
+    const buttons = ALL_FONTS.map((name) => {
+      const st = fontStyle(name);
+      const { powerBi, tableau } = fontSupport(name);
+      const b = h("button", {
+        type: "button",
+        class: "ob-font",
+        "aria-pressed": String(chosenFont === name),
+        style: `font-family:${st.family};font-weight:${st.weight}`,
+        onclick: () => {
+          applyFont(draft.fonts, name);
+          chosenFont = name;
+          buttons.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+          showNotice(name);
+          schedulePreview();
+        },
+      },
+      h("span", { class: "ob-font-aa" }, "Aa"),
+      h("span", { class: "ob-font-name" }, name),
+      h("span", { class: "ob-font-tools" }, powerBi && tableau ? "Power BI + Tableau" : powerBi ? "Power BI only" : "Tableau only"));
+      return b;
+    });
+    showNotice(chosenFont);
     return [
-      group("Power BI font", "powerBi", POWER_BI_FONTS),
-      group("Tableau font", "tableau", TABLEAU_FONTS),
+      notice,
+      h("div", { class: "ob-fonts" }, ...buttons),
       h("p", { class: "ob-note" }, "Fonts show as installed on your computer. Tableau's own fonts appear as a stand-in unless Tableau is installed."),
     ];
   }

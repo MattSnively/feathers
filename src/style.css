@@ -520,6 +520,10 @@ dialog.drawer::backdrop { background: rgba(10, 12, 18, 0.55); }
 .ob-font[aria-pressed="true"] { border-color: var(--ink); }
 .ob-font-aa { font-size: 34px; line-height: 1; }
 .ob-font-name { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.ob-font-tools { font-family: var(--font); font-size: 11.5px; font-weight: 500; color: var(--ink-3); }
+.ob-font-notice { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 20px; padding: 14px 16px; border-radius: 14px; background: var(--surface-2); color: var(--ink); font-size: 14.5px; line-height: 1.45; }
+.ob-font-notice .icon { flex: none; margin-top: 2px; }
+.ob-font-notice.both { background: var(--accent-soft); }
 .ob-note { margin: 20px 0 0; font-size: 13.5px; color: var(--ink-2); }
 
 .ob-name {
