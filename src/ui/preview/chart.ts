@@ -224,6 +224,8 @@ export interface DonutChart {
   weights: number[];
   palette: string[];
   colorOf: (segment: number) => number;
+  /** Surface color behind the donut, used for the hairline between segments. */
+  gap: string;
   edit: Edit;
   ariaLabel: string;
   /** Text in the hole, e.g. a total. */
@@ -234,8 +236,8 @@ export function donutChart(o: DonutChart): SVGSVGElement {
   const c = o.size / 2;
   const segments = donutAngles(o.weights).map(({ start, end }, i) => {
     const idx = o.colorOf(i);
-    // A hairline gap in the surface color separates neighbours without needing a stroke color from the theme.
-    const path = s("path", { d: ringPath(c, c, c - 2, c * 0.58, start, end), fill: o.palette[idx]!, stroke: "#fff", "stroke-width": 1.5 });
+    // A hairline in the surface color separates neighbours.
+    const path = s("path", { d: ringPath(c, c, c - 2, c * 0.58, start, end), fill: o.palette[idx]!, stroke: o.gap, "stroke-width": 1.5 });
     return o.edit(path, `cat-${idx}`, `color ${idx + 1}`);
   });
   const label = o.center

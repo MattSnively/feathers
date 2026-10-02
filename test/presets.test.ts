@@ -36,8 +36,8 @@ describe.each(presets.map((p) => [p.name, p] as const))("preset: %s", (_name, th
 });
 
 describe("preset catalog", () => {
-  it("has the three agreed presets with their published color counts", () => {
-    expect(presets.map((p) => p.palette.categorical.length)).toEqual([8, 8, 9]);
+  it("has the agreed presets with their published color counts", () => {
+    expect(presets.map((p) => p.palette.categorical.length)).toEqual([8, 8, 9, 10, 8, 7]);
   });
 
   it("uses uppercase 6-digit hex so palettes diff cleanly", () => {

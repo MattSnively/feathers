@@ -1,6 +1,6 @@
 import type { Theme } from "../model/theme";
 import { blank } from "../presets/blank";
-import { okabeIto, playfair, tolMuted } from "../presets";
+import { dark2, midnight, okabeIto, playfair, tableau10, tolMuted } from "../presets";
 import { markOnboarded } from "../state/onboarding";
 import type { Mode, Store, Tool } from "../state/store";
 import { buildSidebar } from "./controls";
@@ -15,6 +15,9 @@ const STARTING_POINTS: [string, Theme][] = [
   ["Playfair Data brand", playfair],
   ["Okabe-Ito (colorblind-safe)", okabeIto],
   ["Paul Tol Muted (colorblind-safe)", tolMuted],
+  ["Tableau 10", tableau10],
+  ["ColorBrewer Dark2", dark2],
+  ["Midnight (dark, colorblind-safe)", midnight],
   ["Start from scratch", blank],
 ];
 

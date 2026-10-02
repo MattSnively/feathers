@@ -106,7 +106,7 @@ export function extraPage(page: Exclude<PreviewPage, "overview">, tool: Tool, th
   const cellInk = (bg: string) => (contrastRatio(bg, "#000000") >= contrastRatio(bg, "#FFFFFF") ? "#000000" : "#FFFFFF");
 
   const donut = donutChart({
-    size: 190, weights: SHARE, palette: palette.categorical, colorOf: (i) => i % n, edit, ariaLabel: "Sample donut chart",
+    size: 190, weights: SHARE, palette: palette.categorical, colorOf: (i) => i % n, gap: background.container, edit, ariaLabel: "Sample donut chart",
     center: { label: "100%", text: { ...title, size: titlePx * 1.2, color: text.primary } },
   });
 

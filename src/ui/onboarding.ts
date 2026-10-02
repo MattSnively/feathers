@@ -8,7 +8,7 @@ import type { Theme } from "../model/theme";
 import { fontStyle } from "../preview/style";
 import { DESIGN_WIDTH } from "../preview/zoom";
 import { blank } from "../presets/blank";
-import { okabeIto, playfair, tolMuted } from "../presets";
+import { dark2, midnight, okabeIto, playfair, tableau10, tolMuted } from "../presets";
 import { h } from "./dom";
 import { icon, logoMark } from "./icons";
 import type { Edit } from "./preview/chart";
@@ -19,6 +19,9 @@ const PALETTES = [
   { id: "playfair", title: "Playfair Data", blurb: "Kingfisher blue with an orange feather accent, from the Playfair Data brand.", theme: playfair },
   { id: "okabe", title: "Okabe-Ito", blurb: "Eight colors designed to stay distinct for color-blind viewers.", theme: okabeIto },
   { id: "tol", title: "Paul Tol Muted", blurb: "Nine soft, balanced colors that are also color-blind safe.", theme: tolMuted },
+  { id: "tableau10", title: "Tableau 10", blurb: "Tableau's familiar ten-color palette.", theme: tableau10 },
+  { id: "dark2", title: "ColorBrewer Dark2", blurb: "Eight saturated colors that read well on white.", theme: dark2 },
+  { id: "midnight", title: "Midnight", blurb: "A dark theme on color-blind-safe colors.", theme: midnight },
   { id: "starter", title: "Starter", blurb: "Four clean colors to build your own palette from.", theme: blank },
 ] as const;
 
