@@ -135,6 +135,7 @@ await page.locator('[data-key="add-color"]').click();
 check("add color -> 9 swatches, new one selected", (await page.locator('[data-key^="chip-categorical-"]').count()) === 9 && (await chip(8).getAttribute("aria-pressed")) === "true");
 await page.getByRole("button", { name: /Remove Color 9/ }).click();
 check("remove color -> 8 swatches", (await page.locator('[data-key^="chip-categorical-"]').count()) === 8);
+check("Remove is a spelled-out button, apart from the move arrows", (await page.locator(".remove-color").innerText()).includes("Remove Color") && (await page.locator(".color-editor-head .danger").count()) === 0);
 
 // sequential / diverging use the same editor
 await page.getByRole("button", { name: "Diverging", exact: true }).click();

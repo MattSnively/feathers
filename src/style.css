@@ -146,6 +146,9 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 }
 .icon-btn:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
 .icon-btn.danger:hover:not(:disabled) { color: var(--danger); }
+.btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+.btn.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.remove-color { align-self: flex-start; }
 
 .seg-group {
   display: inline-flex; gap: 2px; padding: 3px;

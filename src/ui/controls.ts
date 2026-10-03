@@ -145,22 +145,23 @@ export function buildSidebar(store: Store): { rail: HTMLElement; panel: HTMLElem
           isCat
             ? h("div", { class: "btn-row" },
                 h("button", { type: "button", class: "icon-btn", title: "Move earlier", "aria-label": `Move ${labelOf(kind, i)} earlier`, disabled: i === 0, "data-key": "move-earlier", onclick: () => move(i, i - 1, "move-earlier") }, icon("left", 18)),
-                h("button", { type: "button", class: "icon-btn", title: "Move later", "aria-label": `Move ${labelOf(kind, i)} later`, disabled: i === n - 1, "data-key": "move-later", onclick: () => move(i, i + 1, "move-later") }, icon("right", 18)),
-                h("button", {
-                  type: "button",
-                  class: "icon-btn danger",
-                  title: "Remove color",
-                  "aria-label": `Remove ${labelOf(kind, i)}`,
-                  disabled: n === 1,
-                  "data-key": "remove-color",
-                  onclick: () => {
-                    selected.categorical = Math.min(i, n - 2);
-                    focusKey = `chip-categorical-${selected.categorical}`;
-                    store.updateTheme((t) => { t.palette.categorical.splice(i, 1); }, "structure");
-                  },
-                }, icon("close", 18)))
+                h("button", { type: "button", class: "icon-btn", title: "Move later", "aria-label": `Move ${labelOf(kind, i)} later`, disabled: i === n - 1, "data-key": "move-later", onclick: () => move(i, i + 1, "move-later") }, icon("right", 18)))
             : null),
         colorEditor(labelOf(kind, i), hex, apply, { key: keyOf(kind, i) }),
+        // Spelled out, and apart from the move arrows, so it can't be mistaken for a "close" button.
+        ...(isCat
+          ? [h("button", {
+              type: "button",
+              class: "btn ghost danger remove-color",
+              disabled: n === 1,
+              "data-key": "remove-color",
+              onclick: () => {
+                selected.categorical = Math.min(i, n - 2);
+                focusKey = `chip-categorical-${selected.categorical}`;
+                store.updateTheme((t) => { t.palette.categorical.splice(i, 1); }, "structure");
+              },
+            }, icon("trash", 16), `Remove ${labelOf(kind, i)} from palette`)]
+          : []),
       );
     }
     renderEditor();
