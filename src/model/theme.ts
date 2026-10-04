@@ -46,6 +46,8 @@ export interface Theme {
   };
   gridline: Line;
   zeroline: Line;
+  /** Power BI's global visual border (every visual type). Tableau's theme has no equivalent. */
+  visualBorder: { visible: boolean; color: Hex };
   fonts: { powerBi: FontSet; tableau: FontSet };
   /** Point sizes shared by both tools. */
   sizes: { body: number; title: number; callout: number };

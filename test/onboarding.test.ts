@@ -85,6 +85,7 @@ describe("importPowerBiTheme", () => {
       expect(t.text).toEqual(preset.text);
       expect(t.background).toEqual(preset.background);
       expect(t.gridline).toEqual(preset.gridline);
+      expect(t.visualBorder).toEqual(preset.visualBorder);
       expect(t.fonts.powerBi).toEqual(preset.fonts.powerBi);
       expect(t.sizes).toEqual(preset.sizes);
     }
@@ -182,5 +183,15 @@ describe("first-run flag", () => {
     const bad = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); } };
     expect(hasOnboarded(bad)).toBe(false);
     expect(() => markOnboarded(bad)).not.toThrow();
+  });
+});
+
+describe("importPowerBiTheme visual border", () => {
+  it("reads a switched-on border and its color", () => {
+    const file = JSON.parse(exportPowerBi(blank));
+    file.visualStyles["*"]["*"].border = [{ show: true, color: { solid: { color: "#111111" } } }];
+    const r = importPowerBiTheme(JSON.stringify(file), blank);
+    expect(r.ok && r.theme.visualBorder).toEqual({ visible: true, color: "#111111" });
+    expect(r.ok && r.applied).toContain("visual border");
   });
 });

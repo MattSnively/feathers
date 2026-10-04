@@ -378,6 +378,24 @@ check("back on Overview the full suite returns", (await page.locator(".pv-tab .p
 await page.reload();
 check("page choice is a view preference and is not saved", (await page.locator('.page-tab[aria-pressed="true"]').innerText()) === "Overview");
 
+// ---- Page gray and the Power BI visual border ----------------------------------------------------
+await page.locator(".tool-tabs button", { hasText: "Power BI" }).click();
+await page.locator("#preset").selectOption({ label: "Okabe-Ito (colorblind-safe)" });
+await tab("canvas");
+check("the neutral presets default to a #F0F0F0 page", (await page.locator('[data-key="bg-page"]').first().inputValue()).toUpperCase() === "#F0F0F0");
+check("Power BI Canvas has a visual border switch and color", (await page.getByRole("switch", { name: "Show border" }).count()) === 1 && (await page.locator('[data-key="border-color"]').count()) >= 1);
+check("the border is off by default in the preview", !(await page.locator(".pv-card").first().getAttribute("style")).includes("border"));
+await page.getByRole("switch", { name: "Show border" }).check();
+// The preview is scaled with CSS zoom, so read the declared style, not the computed width.
+check("switching it on outlines the visuals in black", (await page.locator(".pv-card").first().getAttribute("style")).includes("border: 1px solid rgb(0, 0, 0)"));
+await page.getByRole("switch", { name: "Show border" }).uncheck();
+await page.locator(".tool-tabs button", { hasText: "Tableau" }).click();
+await tab("canvas");
+check("Tableau Canvas has no border control", (await page.getByRole("switch", { name: "Show border" }).count()) === 0);
+check("neutral presets still pass the text-contrast check on the gray page", !(await (async () => { await tab("checks"); return page.locator(".a11y").innerText(); })()).includes("hard to read"));
+
+await tab("colors");
+
 // ---- Live code panel ---------------------------------------------------------------------------
 await pickTool("Power BI");
 await page.locator(".code-toggle").click();

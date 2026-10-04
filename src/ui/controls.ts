@@ -275,7 +275,13 @@ export function buildSidebar(store: Store): { rail: HTMLElement; panel: HTMLElem
         show("page") ? field("page", "Page (Power BI)") : null,
         field("container", "Chart area"),
         hint("Chart area is the visual container in Power BI and the view background in Tableau.")),
-    ];
+      // Tableau's theme has no border setting, so this section is Power BI only.
+      tool === "powerbi"
+        ? section("Visual border", "Outline on every Power BI visual",
+            switchField("Show border", store.get().theme.visualBorder.visible, (v) => store.updateTheme((t) => { t.visualBorder.visible = v; })),
+            colorField("Border color", store.get().theme.visualBorder.color, (hex) => store.updateTheme((t) => { t.visualBorder.color = hex; }), { key: "border-color" }))
+        : null,
+    ].filter((x): x is HTMLElement => x !== null);
   }
 
   // ---- Shell ----------------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 import type { Theme } from "../../model/theme";
-import { calloutPx, css, fontStyle, px } from "../../preview/style";
+import { calloutPx, cardStyle, css, fontStyle, px } from "../../preview/style";
 import { h, s } from "../dom";
 import { columnChart, lineChart, scatterChart, type Edit } from "./chart";
 import { extraPage, type PreviewPage } from "./pages";
@@ -48,7 +48,7 @@ export function powerBiPreview(theme: Theme, edit: Edit, pageName: PreviewPage =
   const common = { gridline, zeroline: null, palette: palette.categorical, edit, text: axis };
 
   const card = (...kids: (Node | null)[]) =>
-    edit(h("div", { class: "pv-card", style: `background:${background.container}` }, ...kids), "bg-container", "chart area background");
+    edit(h("div", { class: "pv-card", style: cardStyle(theme, "powerbi") }, ...kids), "bg-container", "chart area background");
 
   const visualTitle = (label: string) =>
     edit(h("div", { class: "pv-vtitle", style: css(title, titlePx * 0.85, text.primary) }, label), "font-title", "title font");

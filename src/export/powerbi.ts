@@ -9,7 +9,7 @@ const fill = (color: string) => ({ solid: { color } });
 
 export function exportPowerBi(theme: Theme): string {
   validateTheme(theme);
-  const { palette, status, text, background, gridline, fonts, sizes } = theme;
+  const { palette, status, text, background, gridline, visualBorder, fonts, sizes } = theme;
   const pbiFonts = fonts.powerBi;
 
   const axisGridlines = [
@@ -57,6 +57,7 @@ export function exportPowerBi(theme: Theme): string {
       "*": {
         "*": {
           background: [{ show: true, color: fill(background.container), transparency: 0 }],
+          border: [{ show: visualBorder.visible, color: fill(visualBorder.color) }],
           categoryAxis: axisGridlines,
           valueAxis: axisGridlines,
         },

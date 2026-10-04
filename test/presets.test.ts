@@ -46,3 +46,12 @@ describe("preset catalog", () => {
     }
   });
 });
+
+describe("page background", () => {
+  it("defaults the neutral presets to a light gray page behind white visuals", () => {
+    for (const p of presets.filter((x) => x.name !== "Playfair Data" && !x.name.startsWith("Midnight"))) {
+      expect(p.background.page, p.name).toBe("#F0F0F0");
+      expect(p.background.container, p.name).toBe("#FFFFFF");
+    }
+  });
+});

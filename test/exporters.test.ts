@@ -23,6 +23,13 @@ describe("Power BI export", () => {
     expect(out.visualStyles["*"]["*"].valueAxis[0].gridlineStyle).toBe("dotted");
     expect(out.visualStyles["*"]["*"].categoryAxis[0].gridlineColor.solid.color).toBe("#DDDAD3");
   });
+
+  it("writes the global visual border, off by default and black when switched on", () => {
+    expect(out.visualStyles["*"]["*"].border).toEqual([{ show: false, color: { solid: { color: "#000000" } } }]);
+    const on = JSON.parse(exportPowerBi(withTheme({ visualBorder: { visible: true, color: "#000000" } })));
+    expect(validatePowerBi(on), JSON.stringify(validatePowerBi.errors?.slice(0, 3))).toBe(true);
+    expect(on.visualStyles["*"]["*"].border[0]).toEqual({ show: true, color: { solid: { color: "#000000" } } });
+  });
 });
 
 describe("Tableau theme export", () => {

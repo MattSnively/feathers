@@ -1,6 +1,6 @@
 import { contrastRatio } from "../../a11y/color";
 import type { Theme } from "../../model/theme";
-import { css, fontStyle, px, rampColor } from "../../preview/style";
+import { cardStyle, css, fontStyle, px, rampColor } from "../../preview/style";
 import type { Tool } from "../../state/store";
 import { h } from "../dom";
 import { areaChart, donutChart, lineChart, stackedColumnChart, varianceChart, type Edit } from "./chart";
@@ -65,7 +65,7 @@ export function extraPage(page: Exclude<PreviewPage, "overview">, tool: Tool, th
   const titleScale = tool === "powerbi" ? 0.85 : 1;
 
   const card = (...kids: (Node | null)[]) =>
-    edit(h("div", { class: "pv-card", style: `background:${background.container}` }, ...kids), "bg-container", "chart area background");
+    edit(h("div", { class: "pv-card", style: cardStyle(theme, tool) }, ...kids), "bg-container", "chart area background");
   const cardTitle = (label: string) =>
     edit(h("div", { class: "pv-vtitle", style: css(title, titlePx * titleScale, text.primary) }, label), "font-title", "title font");
   const legend = (names: string[]) =>

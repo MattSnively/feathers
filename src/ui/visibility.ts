@@ -24,6 +24,7 @@ export function isAvailable(key: string, mode: Mode, tool: Tool): boolean {
     // Canvas and page backgrounds exist only in Power BI.
     case "bg-canvas":
     case "bg-page":
+    case "border-color":
       return tool === "powerbi";
     default:
       return false;

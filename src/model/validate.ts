@@ -29,6 +29,7 @@ export function validateTheme(theme: Theme): void {
   for (const [key, c] of Object.entries(theme.status)) assertHex(c, `status.${key}`);
   for (const [key, c] of Object.entries(theme.text)) assertHex(c, `text.${key}`);
   for (const [key, c] of Object.entries(theme.background)) assertHex(c, `background.${key}`);
+  assertHex(theme.visualBorder.color, "visualBorder.color");
   assertLine(theme.gridline, "gridline");
   assertLine(theme.zeroline, "zeroline");
 }

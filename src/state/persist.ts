@@ -32,6 +32,8 @@ export function loadState(storage: StorageLike | null = defaultStorage()): AppSt
     if (!raw) return null;
     const parsed = JSON.parse(raw) as AppState;
     if (parsed.tool !== "powerbi" && parsed.tool !== "tableau") return null;
+    // Saved before the visual border existed: add it switched off.
+    parsed.theme.visualBorder ??= { visible: false, color: "#000000" };
     // Running every exporter proves the stored theme is complete, not just well-typed.
     exportPowerBi(parsed.theme);
     exportTableauTheme(parsed.theme);

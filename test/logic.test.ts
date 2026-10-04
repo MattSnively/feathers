@@ -130,6 +130,13 @@ describe("persistence", () => {
     expect(loadState(storage)).toEqual({ theme: okabeIto, tool: "tableau", mode: "advanced" });
   });
 
+  it("restores a theme saved before the visual border existed, with the border off", () => {
+    const { visualBorder: _omit, ...legacy } = okabeIto;
+    const storage = fakeStorage();
+    storage.setItem("feathers.state.v1", JSON.stringify({ theme: legacy, tool: "powerbi", mode: "beginner" }));
+    expect(loadState(storage)?.theme.visualBorder).toEqual({ visible: false, color: "#000000" });
+  });
+
   it("returns null when nothing is stored, storage is absent, or JSON is corrupt", () => {
     expect(loadState(fakeStorage())).toBeNull();
     expect(loadState(null)).toBeNull();

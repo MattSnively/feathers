@@ -70,3 +70,9 @@ export function rampColor(stops: string[], t: number): string {
 /** Inline CSS for text in a theme font. */
 export const css = (f: FontStyle, sizePx: number, color: string) =>
   `font-family:${f.family};font-weight:${f.weight};font-size:${sizePx}px;color:${color}`;
+
+/** Inline style for a visual container: its background, plus the global border when Power BI's is on. */
+export function cardStyle(theme: { background: { container: string }; visualBorder: { visible: boolean; color: string } }, tool: "powerbi" | "tableau"): string {
+  const border = tool === "powerbi" && theme.visualBorder.visible ? `;border:1px solid ${theme.visualBorder.color}` : "";
+  return `background:${theme.background.container}${border}`;
+}

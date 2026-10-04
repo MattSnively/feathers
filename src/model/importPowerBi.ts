@@ -104,6 +104,15 @@ export function importPowerBiTheme(text: string, base: Theme): ImportResult {
     applied.push("backgrounds");
   }
 
+  // ---- Visual border --------------------------------------------------------------------------
+  const border = first(everyVisual.border);
+  if (border) {
+    const borderColor = solid(border.color);
+    if (typeof border.show === "boolean") t.visualBorder.visible = border.show;
+    if (borderColor) t.visualBorder.color = borderColor;
+    if (typeof border.show === "boolean" || borderColor) applied.push("visual border");
+  }
+
   // ---- Gridlines ------------------------------------------------------------------------------
   const axis = first(everyVisual.valueAxis) ?? first(everyVisual.categoryAxis);
   const gridColor = (axis ? solid(axis.gridlineColor) : null) ?? color(json.thirdLevelElements);
