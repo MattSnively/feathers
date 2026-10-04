@@ -266,7 +266,8 @@ check("Checks cards have a uniform border (no left accent)", await page.locator(
 check("simulated palettes for 3 vision types", (await page.locator(".a11y .chips").count()) === 3);
 await page.locator("#preset").selectOption({ label: "Okabe-Ito (colorblind-safe)" });
 check("preset sets the name", (await page.locator("#theme-name").inputValue()).startsWith("Okabe-Ito"));
-check("badge updates for the new preset (1 finding)", (await page.locator(".rail-badge").innerText()) === "1", await page.locator(".rail-badge").innerText());
+check("Okabe-Ito has nothing to check, so the badge is hidden", !(await page.locator(".rail-badge").isVisible()), await page.locator(".rail-badge").innerText());
+check("the light-yellow note shows separately under Good to know", (await panelText()).includes("Good to know") && (await panelText()).includes("Light data colors on the chart background") && (await page.locator(".a11y-summary").innerText()) === "No problems found by these checks.");
 check("Okabe-Ito: no color-confusion findings", !(await panelText()).includes("look alike"));
 await tab("colors");
 check("preset loads its swatches", (await chipColor(0)) === "#E69F00");

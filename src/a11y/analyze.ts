@@ -25,7 +25,10 @@ export interface Simulation {
 }
 
 export interface A11yReport {
+  /** Things that make a palette hard to use for some viewers; these count toward the Checks badge. */
   findings: Finding[];
+  /** Closer to a design preference than a defect: shown separately and never counted. */
+  notes: Finding[];
   simulations: Simulation[];
 }
 
@@ -83,7 +86,7 @@ function distinguishability(group: ColorGroup): Finding[] {
 
 function contrastFindings(theme: Theme): Finding[] {
   const findings: Finding[] = [];
-  const { text, background, palette } = theme;
+  const { text, background } = theme;
 
   const textRoles: [keyof Theme["text"], string][] = [
     ["primary", "Primary text"],
@@ -103,20 +106,27 @@ function contrastFindings(theme: Theme): Finding[] {
     }
   }
 
+  return findings;
+}
+
+/**
+ * Light data colors on the chart background. Fine for large fills, harder to see as thin lines and small
+ * points, and plenty of normal palettes include one, so this is a note rather than a problem.
+ */
+function graphicContrastNotes(theme: Theme): Finding[] {
+  const { background, palette } = theme;
   const faint = palette.categorical
     .map((c, i) => ({ c, i, ratio: contrastRatio(c, background.container) }))
     .filter((x) => x.ratio < MIN_GRAPHIC_CONTRAST);
-  if (faint.length > 0) {
-    const listed = faint.slice(0, MAX_PAIRS_LISTED).map((x) => `color ${x.i + 1} (${x.ratio.toFixed(1)}:1)`);
-    const more = faint.length > listed.length ? `, and ${faint.length - listed.length} more` : "";
-    findings.push({
-      id: "graphic-contrast",
-      title: "Data colors that are faint on the chart background",
-      detail: `${listed.join(", ")}${more}. Chart marks need at least ${MIN_GRAPHIC_CONTRAST}:1 against the background (WCAG 1.4.11). Fine for large fills, risky for thin lines and small points.`,
-      colors: [...faint.slice(0, MAX_PAIRS_LISTED).map((x) => x.c), background.container],
-    });
-  }
-  return findings;
+  if (faint.length === 0) return [];
+  const listed = faint.slice(0, MAX_PAIRS_LISTED).map((x) => `color ${x.i + 1} (${x.ratio.toFixed(1)}:1)`);
+  const more = faint.length > listed.length ? `, and ${faint.length - listed.length} more` : "";
+  return [{
+    id: "graphic-contrast",
+    title: "Light data colors on the chart background",
+    detail: `${listed.join(", ")}${more}. Fine for bars and large fills. For thin lines and small points, WCAG 1.4.11 suggests at least ${MIN_GRAPHIC_CONTRAST}:1 against the background.`,
+    colors: [...faint.slice(0, MAX_PAIRS_LISTED).map((x) => x.c), background.container],
+  }];
 }
 
 export function analyzeTheme(theme: Theme): A11yReport {
@@ -129,6 +139,7 @@ export function analyzeTheme(theme: Theme): A11yReport {
 
   return {
     findings: [...groups.flatMap(distinguishability), ...contrastFindings(theme)],
+    notes: graphicContrastNotes(theme),
     simulations: VISIONS.map((vision) => ({ vision, categorical: palette.categorical.map((c) => simulate(c, vision)) })),
   };
 }

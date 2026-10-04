@@ -62,17 +62,21 @@ describe("theme analysis on the shipped presets", () => {
     expect(found).toContain("similar-Data colors-normal");
     // Muted text (#9C8F82) on white is about 3.2:1.
     expect(found).toContain("text-contrast-muted");
-    // Orange Feather and Dark Yellow are faint on a white chart area.
-    expect(found).toContain("graphic-contrast");
+  });
+
+  it("keeps faint data colors out of the findings, as a note instead", () => {
+    // Orange Feather and Dark Yellow are faint on a white chart area, but that is a preference, not a defect.
+    expect(ids(playfair)).not.toContain("graphic-contrast");
+    expect(analyzeTheme(playfair).notes.map((n) => n.id)).toEqual(["graphic-contrast"]);
   });
 
   it.each([okabeIto, tolMuted])("finds no color-confusion problems in $name", (theme) => {
     expect(ids(theme).filter((id) => id.startsWith("similar-"))).toEqual([]);
   });
 
-  it("reports faint data colors on the accessible presets rather than hiding them", () => {
-    expect(ids(okabeIto)).toContain("graphic-contrast");
-    const detail = analyzeTheme(okabeIto).findings.find((f) => f.id === "graphic-contrast")!.detail;
+  it("reports faint data colors on the accessible presets as a note rather than hiding them", () => {
+    expect(ids(okabeIto)).toEqual([]);
+    const detail = analyzeTheme(okabeIto).notes.find((f) => f.id === "graphic-contrast")!.detail;
     expect(detail).toContain("color 4"); // yellow #F0E442 on white is ~1.3:1
   });
 
@@ -83,6 +87,7 @@ describe("theme analysis on the shipped presets", () => {
       status: { good: "#0072B2", neutral: "#767676", bad: "#D55E00" },
     };
     expect(analyzeTheme(clean).findings).toEqual([]);
+    expect(analyzeTheme(clean).notes).toEqual([]);
   });
 
   it("returns one simulation per vision type, one color per data color", () => {

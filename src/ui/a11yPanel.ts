@@ -1,4 +1,4 @@
-import { analyzeTheme } from "../a11y/analyze";
+import { analyzeTheme, type Finding } from "../a11y/analyze";
 import { VISION_LABEL } from "../a11y/cvd";
 import type { Store } from "../state/store";
 import { h } from "./dom";
@@ -19,13 +19,17 @@ export function buildA11yPanel(store: Store): HTMLElement {
     const text = n === 0 ? "No problems found by these checks." : `${n} thing${n === 1 ? "" : "s"} to check.`;
     if (summary.textContent !== text) summary.textContent = text;
 
+    const finding = (f: Finding, prefix: string) =>
+      h("li", { class: "finding" },
+        h("div", { class: "finding-chips", "aria-hidden": "true" }, ...f.colors.map((c) => chip(c, c))),
+        h("div", {}, h("strong", {}, `${prefix}${f.title}`), h("p", {}, f.detail)));
+
     body.replaceChildren(
       n === 0
-        ? h("p", { class: "hint" }, "Colors are distinguishable under the simulations below, and text and marks meet contrast limits.")
-        : h("ul", { class: "findings" }, ...report.findings.map((f) =>
-            h("li", { class: "finding" },
-              h("div", { class: "finding-chips", "aria-hidden": "true" }, ...f.colors.map((c) => chip(c, c))),
-              h("div", {}, h("strong", {}, `Check: ${f.title}`), h("p", {}, f.detail))))),
+        ? h("p", { class: "hint" }, "Colors are distinguishable under the simulations below, and text meets contrast limits.")
+        : h("ul", { class: "findings" }, ...report.findings.map((f) => finding(f, "Check: "))),
+      // Not counted in the summary or the badge: a design preference more than a problem.
+      ...(report.notes.length > 0 ? [h("h4", {}, "Good to know"), h("ul", { class: "findings" }, ...report.notes.map((f) => finding(f, "")))] : []),
       h("h4", {}, "How your data colors look with color blindness"),
       ...report.simulations.flatMap((s) => [
         h("p", { class: "strip-label" }, VISION_LABEL[s.vision][0]!.toUpperCase() + VISION_LABEL[s.vision].slice(1)),
