@@ -69,6 +69,9 @@ for (let i = 0; i < 9; i++) { seenFonts.add(await fontOf()); seenColors.add(awai
 check("'colors' cycles through several colors", seenColors.size >= 3, [...seenColors].join(" | "));
 check("'fonts' cycles through several fonts", seenFonts.size >= 3, [...seenFonts].join(" | "));
 const only = [...seenFonts].filter((f) => f).every((f) => /Arial|Calibri|Courier New|Georgia|Times New Roman|Trebuchet MS|Verdana/.test(f));
+const btnColors = new Set();
+for (let i = 0; i < 9; i++) { btnColors.add(await page.locator(".ob-actions .btn.primary").evaluate((e) => e.style.backgroundColor)); await page.waitForTimeout(700); }
+check("the Continue button cycles through readable palette colors", [...btnColors].filter((c) => c).length >= 3, [...btnColors].join(" | "));
 check("only fonts that work in both tools are shown", only, [...seenFonts].join(" | "));
 check("cycled colors come from the palette and are readable", [...seenColors].filter((c) => c).every((c) => ["rgb(10, 55, 70)", "rgb(15, 84, 44)", "rgb(138, 30, 0)", "rgb(179, 96, 0)", "rgb(3, 34, 44)", "rgb(156, 143, 130)", "rgb(249, 154, 43)", "rgb(178, 175, 115)"].includes(c)), [...seenColors].join(" | "));
 {
@@ -78,6 +81,7 @@ check("cycled colors come from the palette and are readable", [...seenColors].fi
   await rp.locator(".onboard").waitFor();
   await rp.waitForTimeout(4500);
   check("reduced motion: the headline stays still", (await rp.locator(".cycle-fonts").evaluate((e) => e.style.fontFamily)) === "" && (await rp.locator(".cycle-colors").evaluate((e) => e.style.color)) === "");
+  check("reduced motion: the Continue button stays its normal blue", (await rp.locator(".ob-actions .btn.primary").evaluate((e) => e.style.backgroundColor)) === "");
   await rm.close();
 }
 await page.screenshot({ path: path.join(SHOTS, "ob-1.png") });

@@ -36,6 +36,7 @@ const HEADINGS: [string, string][] = [
 const SHARED_FONTS = ALL_FONTS.filter((f) => fontSupport(f).powerBi && fontSupport(f).tableau);
 const COLOR_CYCLE_MS = 1500;
 const FONT_CYCLE_MS = 2100;
+const BUTTON_CYCLE_MS = 1800;
 
 /**
  * Calls `apply` with the next value every `ms` until the element leaves the page. Does nothing for people
@@ -366,12 +367,21 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
     const [title, lead] = HEADINGS[step]!;
     const heading = h("h1", { tabIndex: -1 }, ...(step === 0 ? animatedHeadline(title, () => draft.palette.categorical) : [title]));
     const last = step === STEP_COUNT - 1;
+    const forward = h("button", { type: "button", class: "btn primary big", onclick: last ? finish : () => go(step + 1) }, CONTINUE_LABELS[step]!, last ? null : icon("right", 18));
+    // The first step's button cycles through the palette too; only colors that keep its white label readable take part.
+    if (step === 0) {
+      forward.classList.add("cycle-btn");
+      cycle(forward, () => draft.palette.categorical.filter((c) => contrastRatio(c, "#FFFFFF") >= 4.5), BUTTON_CYCLE_MS, (c) => {
+        forward.style.setProperty("background", c);
+        forward.style.setProperty("border-color", c);
+      });
+    }
     // The way forward sits right under the header so it can't be missed below a long list of choices.
     copy.replaceChildren(
       heading,
       h("p", { class: "ob-lead" }, lead),
       h("div", { class: "ob-actions" },
-        h("button", { type: "button", class: "btn primary big", onclick: last ? finish : () => go(step + 1) }, CONTINUE_LABELS[step]!, last ? null : icon("right", 18)),
+        forward,
         step > 0 ? h("button", { type: "button", class: "btn big", onclick: () => go(step - 1) }, "Back") : null));
     content.replaceChildren(...(step === 0 ? colorsStep() : step === 1 ? fontsStep() : startStep()));
     heading.focus({ preventScroll: true });
