@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { peacockMarkup, peacockSvg } from "../src/ui/logoMarkup";
+import { fanSvg, peacockMarkup } from "../src/ui/logoMarkup";
 
 describe("logo", () => {
   it("draws seven feathers, each with an eye, plus the bird", () => {
@@ -18,9 +18,10 @@ describe("logo", () => {
     }
   });
 
-  it("uses the same drawing for the favicon", () => {
+  it("uses the fan alone, without the bird, for the favicon", () => {
     const html = readFileSync(new URL("../index.html", import.meta.url), "utf-8");
     const href = /href="data:image\/svg\+xml,([^"]*)"/.exec(html)?.[1];
-    expect(decodeURIComponent(href ?? "")).toBe(peacockSvg());
+    expect(decodeURIComponent(href ?? "")).toBe(fanSvg());
+    expect(fanSvg()).not.toContain("<rect");
   });
 });

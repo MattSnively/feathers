@@ -1,7 +1,6 @@
 import type { Theme } from "../model/theme";
 import { blank } from "../presets/blank";
 import { dark2, midnight, okabeIto, playfair, tableau10, tolMuted } from "../presets";
-import { markOnboarded } from "../state/onboarding";
 import type { Mode, Store, Tool } from "../state/store";
 import { buildSidebar } from "./controls";
 import { h } from "./dom";
@@ -92,14 +91,18 @@ function buildDrawer(store: Store) {
   return { element: dialog, open: () => dialog.showModal() };
 }
 
-export function mountApp(root: HTMLElement, store: Store, opts: { showOnboarding?: boolean } = {}): void {
+export function mountApp(root: HTMLElement, store: Store, opts: { showOnboarding?: boolean; returning?: boolean } = {}): void {
   const sidebar = buildSidebar(store);
   const stage = buildPreview(store, sidebar.reveal);
   const drawer = buildDrawer(store);
   let overlay: HTMLElement | null = null;
+  // Once there's work to go back to, the landing page's skip says so.
+  let hasWork = opts.returning === true;
 
   const topbar = h("header", { class: "topbar" },
-    h("div", { class: "brand" }, logoMark(38), h("span", { class: "brand-name" }, "Feathers")),
+    // The way back to the start page from anywhere in the editor.
+    h("button", { type: "button", class: "brand brand-home", title: "Back to the start page", "aria-label": "Feathers, back to the start page", onclick: () => launchOnboarding() },
+      logoMark(38), h("span", { class: "brand-name" }, "Feathers")),
     h("div", { class: "tool-tabs" },
       segmentedControl<Tool>(TOOLS, () => store.get().tool, (t) => store.setTool(t), { label: "I'm building for" })),
     schemaChip(store),
@@ -117,7 +120,7 @@ export function mountApp(root: HTMLElement, store: Store, opts: { showOnboarding
   function launchOnboarding() {
     if (overlay) return;
     const close = () => {
-      markOnboarded();
+      hasWork = true;
       overlay?.remove();
       overlay = null;
       app.inert = false;
@@ -130,6 +133,7 @@ export function mountApp(root: HTMLElement, store: Store, opts: { showOnboarding
         close();
       },
       onSkip: close,
+      skipLabel: hasWork ? "Back to the editor" : "Skip for now",
     });
     overlay = flow.element;
     root.append(overlay);

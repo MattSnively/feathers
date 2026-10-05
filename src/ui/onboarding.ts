@@ -8,7 +8,7 @@ import type { Theme } from "../model/theme";
 import { fontStyle } from "../preview/style";
 import { DESIGN_WIDTH } from "../preview/zoom";
 import { blank } from "../presets/blank";
-import { dark2, midnight, okabeIto, playfair, tableau10, tolMuted } from "../presets";
+import { dark2, midnight, okabeIto, playfair, presets, tableau10, tolMuted } from "../presets";
 import { h } from "./dom";
 import { icon, logoMark } from "./icons";
 import type { Edit } from "./preview/chart";
@@ -94,6 +94,7 @@ const noEdit: Edit = (el) => el;
 export interface OnboardingHandlers {
   onFinish: (theme: Theme) => void;
   onSkip: () => void;
+  skipLabel: string;
 }
 
 /**
@@ -107,7 +108,9 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
   // Tracked apart from the theme: picking Tableau's default font leaves the theme looking untouched.
   let chosenFont = currentFont(draft.fonts);
   // Where the name came from decides whether a palette choice may rename the theme: only typed names are sticky.
-  let nameSource: "default" | "import" | "typed" = "default";
+  // A saved theme with its own name keeps it; only a preset's or the placeholder name follows the palette.
+  const generated = new Set<string>([...presets.map((p) => p.name), ...PALETTES.map((p) => p.title), "My theme", "Untitled theme"]);
+  let nameSource: "default" | "import" | "typed" = generated.has(initial.name) ? "default" : "typed";
 
   // ---- Example dashboard ----------------------------------------------------------------------
 
@@ -379,7 +382,7 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
   const element = h("div", { class: "onboard", role: "region", "aria-label": "Get started" },
     h("header", { class: "ob-head" },
       h("div", { class: "brand" }, logoMark(38), h("span", { class: "brand-name" }, "Feathers")),
-      h("button", { type: "button", class: "ob-skip", onclick: handlers.onSkip }, "Skip for now")),
+      h("button", { type: "button", class: "ob-skip", onclick: handlers.onSkip }, handlers.skipLabel)),
     h("div", { class: "ob-body" }, h("div", { class: "ob-left" }, copy, example), content));
 
   return {

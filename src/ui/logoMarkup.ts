@@ -55,3 +55,14 @@ export function peacockMarkup(): string {
 }
 
 export const peacockSvg = (): string => `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>${peacockMarkup()}</svg>`.replace(/"/g, "'");
+
+/** The favicon: just the fan. The bird is too fine to read at 16px, so it is left out. */
+export const fanSvg = (): string => {
+  const feathers = FEATHERS.filter(([a]) => a !== 0 && Math.abs(a) > 30)
+    .concat(FEATHERS.filter(([a]) => a !== 0 && Math.abs(a) <= 30))
+    .concat(FEATHERS.filter(([a]) => a === 0))
+    .map(([a, c]) => feather(a, c))
+    .join("");
+  // Square viewBox centered on the fan.
+  return `<svg xmlns='http://www.w3.org/2000/svg' viewBox='1 2 30 30'>${feathers}</svg>`.replace(/"/g, "'");
+};

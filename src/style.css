@@ -96,6 +96,8 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   border-bottom: 1px solid var(--border);
 }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); }
+button.brand { padding: 0; border: 0; background: none; font: inherit; cursor: pointer; }
+button.brand:hover .brand-name { text-decoration: underline; text-underline-offset: 4px; }
 .brand-name { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
 .logo-mark { display: block; }
 .name-wrap { flex: 1; min-width: 0; display: flex; justify-content: center; }

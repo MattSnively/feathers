@@ -173,37 +173,50 @@ check("focus lands in the editor", await page.evaluate(() => !!document.activeEl
 await page.screenshot({ path: path.join(SHOTS, "ob-editor.png") });
 
 // =============================================================================================
-// D. First visit only; New theme; Skip
+// D. The landing page every time; New theme; Skip; deep link
 // =============================================================================================
-check("the flag is stored", (await page.evaluate(() => localStorage.getItem("feathers.onboarded.v1"))) === "1");
-await page.reload();
-check("reload goes straight to the editor", (await page.locator(".onboard").count()) === 0 && (await page.locator("#theme-name").inputValue()) === "My Brand Theme");
 const savedState = await page.evaluate(() => localStorage.getItem("feathers.state.v1"));
+await page.reload();
+check("reload starts on the landing page again", await page.locator(".onboard").isVisible());
+check("...starting from the saved theme (9 Tol colors)", (await tiles().count()) === 9 && (await palettePressed("tol")) === "true");
+check("a returning visitor's skip says where it goes", (await page.locator(".ob-skip").innerText()) === "Back to the editor");
+await nextBtn().click();
+await nextBtn().click();
+check("the saved theme's own name is kept, not renamed after the palette", (await page.locator("#ob-name").inputValue()) === "My Brand Theme");
+await page.getByRole("button", { name: "Back to the editor" }).click();
+check("Back to the editor closes it without changing anything", (await page.locator(".onboard").count()) === 0 && (await page.locator("#theme-name").inputValue()) === "My Brand Theme");
+check("focus returns to the editor after skipping", await page.evaluate(() => !!document.activeElement?.closest(".rail")));
 
+await page.getByRole("button", { name: "Back to the start page" }).click();
+check("the logo in the top bar returns to the landing page", await page.locator(".onboard").isVisible() && (await h1()) === "Customize your colors and fonts before you even start your dashboard.");
+await page.getByRole("button", { name: "Back to the editor" }).click();
 await page.getByRole("button", { name: "New theme" }).click();
-check("New theme reopens the flow", await page.locator(".onboard").isVisible() && (await h1()) === "Customize your colors and fonts before you even start your dashboard.");
-check("...starting from the current theme (9 Tol colors)", (await tiles().count()) === 9 && (await palettePressed("tol")) === "true");
-await page.getByRole("button", { name: "Skip for now" }).click();
-check("Skip closes it without changing anything", (await page.locator(".onboard").count()) === 0 && (await page.locator("#theme-name").inputValue()) === "My Brand Theme");
-check("focus returns to the editor after Skip", await page.evaluate(() => !!document.activeElement?.closest(".rail")));
+check("New theme reopens the flow too", await page.locator(".onboard").isVisible() && (await tiles().count()) === 9);
+await page.getByRole("button", { name: "Back to the editor" }).click();
+
+await page.goto("http://localhost:4173/#editor");
+await page.reload();
+check("#editor opens the editor directly", (await page.locator(".onboard").count()) === 0 && (await page.locator("#theme-name").inputValue()) === "My Brand Theme");
 await context.close();
 
-// skipping on a true first visit
+// a first-time visitor skipping, then reloading, still lands on the start page
 ({ context, page } = await fresh());
+check("first visit: skip is labeled 'Skip for now'", (await page.locator(".ob-skip").innerText()) === "Skip for now");
 await page.getByRole("button", { name: "Skip for now" }).click();
 check("Skip on first visit shows the default Playfair editor", (await page.locator("#theme-name").inputValue()) === "Playfair Data" && (await page.locator(".onboard").count()) === 0);
 await page.reload();
-check("...and doesn't come back after reload", (await page.locator(".onboard").count()) === 0);
+check("...and reload brings the landing page back", await page.locator(".onboard").isVisible());
 await context.close();
 
-// a user with a saved theme from before the flow existed goes straight to the editor
+// a saved theme from an earlier session also starts on the landing page, then Skip returns to it
 context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
 await context.addInitScript((state) => { try { localStorage.setItem("feathers.state.v1", state); } catch {} }, savedState);
 page = await context.newPage();
 watch(page);
 await page.goto("http://localhost:4173/");
-await page.locator("#theme-name").waitFor();
-check("a saved theme with no flag skips the flow", (await page.locator(".onboard").count()) === 0 && (await page.locator("#theme-name").inputValue()) === "My Brand Theme");
+await page.locator(".onboard").waitFor();
+await page.getByRole("button", { name: "Back to the editor" }).click();
+check("a saved theme still lands on the start page first, and Skip returns to it", (await page.locator(".onboard").count()) === 0 && (await page.locator("#theme-name").inputValue()) === "My Brand Theme");
 await context.close();
 
 // =============================================================================================

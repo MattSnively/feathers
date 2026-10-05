@@ -5,7 +5,6 @@ import { exportPowerBi } from "../src/export/powerbi";
 import { MAX_COLORS, parseHexList } from "../src/model/hexlist";
 import { importPowerBiTheme } from "../src/model/importPowerBi";
 import { deriveRamps } from "../src/model/ramps";
-import { hasOnboarded, markOnboarded } from "../src/state/onboarding";
 import { blank } from "../src/presets/blank";
 import { okabeIto, playfair, presets } from "../src/presets";
 
@@ -162,27 +161,6 @@ describe("importPowerBiTheme", () => {
     const before = JSON.stringify(blank);
     importPowerBiTheme(exportPowerBi(playfair), blank);
     expect(JSON.stringify(blank)).toBe(before);
-  });
-});
-
-describe("first-run flag", () => {
-  const fake = () => {
-    const m = new Map<string, string>();
-    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v) };
-  };
-
-  it("is false until marked, then true", () => {
-    const s = fake();
-    expect(hasOnboarded(s)).toBe(false);
-    markOnboarded(s);
-    expect(hasOnboarded(s)).toBe(true);
-  });
-
-  it("shows the flow when storage is missing or throws", () => {
-    expect(hasOnboarded(null)).toBe(false);
-    const bad = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); } };
-    expect(hasOnboarded(bad)).toBe(false);
-    expect(() => markOnboarded(bad)).not.toThrow();
   });
 });
 
