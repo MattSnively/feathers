@@ -64,7 +64,9 @@ function animatedHeadline(title: string, palette: () => readonly string[]): (Nod
     // Only the family changes; the heading's own weight keeps the word as bold as its neighbours.
     fonts.style.setProperty("font-family", fontStyle(name).family);
   });
-  return [before, colors, between, fonts, after];
+  // A hard break after "fonts" keeps the rest of the sentence still while the word changes width. The space
+  // before it keeps the words apart for anything that reads the heading as text.
+  return [before, colors, between, fonts, " ", h("br"), after.trimStart()];
 }
 
 const CONTINUE_LABELS = ["Continue to fonts", "Continue", "Open the editor"];

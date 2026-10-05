@@ -36,7 +36,8 @@ const fresh = async (viewport = { width: 1920, height: 1080 }) => {
 // =============================================================================================
 let { context, page } = await fresh();
 const ob = page.locator(".onboard");
-const h1 = () => page.locator(".onboard h1").innerText();
+// The headline has a hard line break after "fonts"; read it as one sentence.
+const h1 = async () => (await page.locator(".onboard h1").innerText()).replace(/\s+/g, " ").trim();
 const tiles = () => page.locator(".ob-tile");
 const tileHex = () => page.locator(".ob-tile-hex").allInnerTexts();
 const palettePressed = (id) => page.locator(`[data-palette="${id}"]`).getAttribute("aria-pressed");
@@ -59,6 +60,7 @@ check("palettes and own colors are on the right, below nothing but the header", 
 check("preview uses the palette", (await previewFill()) === "#0A3746");
 check("preview is decorative (hidden from assistive tech)", (await page.locator(".ob-example [aria-hidden=\"true\"]").count()) === 1);
 check("the example fits in view at 1920x1080", await page.locator(".ob-example").evaluate((e) => e.getBoundingClientRect().bottom <= innerHeight), String(await page.locator(".ob-example").evaluate((e) => e.getBoundingClientRect().bottom)));
+check("hard line break after 'fonts', so the second line never moves", (await page.locator(".onboard h1 br").count()) === 1 && await page.locator(".onboard h1").evaluate((h) => { const f = h.querySelector(".cycle-fonts").getBoundingClientRect(); const br = h.querySelector("br").previousSibling; const r = document.createRange(); r.selectNodeContents(h); const last = [...r.getClientRects()].pop(); return last.top > f.bottom - 4; }));
 const fontOf = () => page.locator(".cycle-fonts").evaluate((e) => e.style.fontFamily);
 const colorOf = () => page.locator(".cycle-colors").evaluate((e) => e.style.color);
 check("the headline still reads as one sentence", (await h1()) === "Customize your colors and fonts before you even start your dashboard.");
