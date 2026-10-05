@@ -599,3 +599,10 @@ dialog.drawer::backdrop { background: rgba(10, 12, 18, 0.55); }
   .stage-body { flex-direction: column; }
   .code-panel { flex: none; height: 50vh; border-left: 0; border-top: 1px solid var(--border); }
 }
+
+/* Landing headline: "colors" and "fonts" cycle. The words stay the same, so the heading reads normally without motion. */
+.cycle-colors { transition: color 0.6s ease; }
+.cycle-fonts { display: inline-block; }
+@media (prefers-reduced-motion: reduce) {
+  .cycle-colors { transition: none; }
+}

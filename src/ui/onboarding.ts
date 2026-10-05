@@ -32,6 +32,41 @@ const HEADINGS: [string, string][] = [
   ["Name your theme", "This names your downloaded files. You can rename it any time."],
 ];
 
+/** Fonts that work in both tools: the ones the headline's "fonts" cycles through. */
+const SHARED_FONTS = ALL_FONTS.filter((f) => fontSupport(f).powerBi && fontSupport(f).tableau);
+const COLOR_CYCLE_MS = 1500;
+const FONT_CYCLE_MS = 2100;
+
+/**
+ * Calls `apply` with the next value every `ms` until the element leaves the page. Does nothing for people
+ * who ask for reduced motion, so the headline just stays as plain text.
+ */
+function cycle<T>(el: HTMLElement, values: () => readonly T[], ms: number, apply: (value: T) => void): void {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  let i = 0;
+  const timer = window.setInterval(() => {
+    if (!el.isConnected) return window.clearInterval(timer);
+    if (document.hidden) return;
+    const list = values();
+    if (list.length > 0) apply(list[++i % list.length]!);
+  }, ms);
+}
+
+/** The first step's headline, with "colors" and "fonts" animated. The text itself never changes. */
+function animatedHeadline(title: string, palette: () => readonly string[]): (Node | string)[] {
+  const [before, rest] = title.split("colors") as [string, string];
+  const [between, after] = rest.split("fonts") as [string, string];
+  const colors = h("span", { class: "cycle-colors" }, "colors");
+  const fonts = h("span", { class: "cycle-fonts" }, "fonts");
+  // Light colors wouldn't read as headline text, so only those with enough contrast on white take part.
+  cycle(colors, () => palette().filter((c) => contrastRatio(c, "#FFFFFF") >= 3), COLOR_CYCLE_MS, (c) => colors.style.setProperty("color", c));
+  cycle(fonts, () => SHARED_FONTS, FONT_CYCLE_MS, (name) => {
+    // Only the family changes; the heading's own weight keeps the word as bold as its neighbours.
+    fonts.style.setProperty("font-family", fontStyle(name).family);
+  });
+  return [before, colors, between, fonts, after];
+}
+
 const CONTINUE_LABELS = ["Continue to fonts", "Continue", "Open the editor"];
 
 const sameColors = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((c, i) => c === b[i]);
@@ -324,7 +359,7 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
   function go(next: number) {
     step = next;
     const [title, lead] = HEADINGS[step]!;
-    const heading = h("h1", { tabIndex: -1 }, title);
+    const heading = h("h1", { tabIndex: -1 }, ...(step === 0 ? animatedHeadline(title, () => draft.palette.categorical) : [title]));
     const last = step === STEP_COUNT - 1;
     // The way forward sits right under the header so it can't be missed below a long list of choices.
     copy.replaceChildren(

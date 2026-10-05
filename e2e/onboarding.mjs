@@ -59,6 +59,25 @@ check("palettes and own colors are on the right, below nothing but the header", 
 check("preview uses the palette", (await previewFill()) === "#0A3746");
 check("preview is decorative (hidden from assistive tech)", (await page.locator(".ob-example [aria-hidden=\"true\"]").count()) === 1);
 check("the example fits in view at 1920x1080", await page.locator(".ob-example").evaluate((e) => e.getBoundingClientRect().bottom <= innerHeight), String(await page.locator(".ob-example").evaluate((e) => e.getBoundingClientRect().bottom)));
+const fontOf = () => page.locator(".cycle-fonts").evaluate((e) => e.style.fontFamily);
+const colorOf = () => page.locator(".cycle-colors").evaluate((e) => e.style.color);
+check("the headline still reads as one sentence", (await h1()) === "Customize your colors and fonts before you even start your dashboard.");
+const seenFonts = new Set(), seenColors = new Set();
+for (let i = 0; i < 9; i++) { seenFonts.add(await fontOf()); seenColors.add(await colorOf()); await page.waitForTimeout(700); }
+check("'colors' cycles through several colors", seenColors.size >= 3, [...seenColors].join(" | "));
+check("'fonts' cycles through several fonts", seenFonts.size >= 3, [...seenFonts].join(" | "));
+const only = [...seenFonts].filter((f) => f).every((f) => /Arial|Calibri|Courier New|Georgia|Times New Roman|Trebuchet MS|Verdana/.test(f));
+check("only fonts that work in both tools are shown", only, [...seenFonts].join(" | "));
+check("cycled colors come from the palette and are readable", [...seenColors].filter((c) => c).every((c) => ["rgb(10, 55, 70)", "rgb(15, 84, 44)", "rgb(138, 30, 0)", "rgb(179, 96, 0)", "rgb(3, 34, 44)", "rgb(156, 143, 130)", "rgb(249, 154, 43)", "rgb(178, 175, 115)"].includes(c)), [...seenColors].join(" | "));
+{
+  const rm = await browser.newContext({ viewport: { width: 1920, height: 1080 }, reducedMotion: "reduce" });
+  const rp = await rm.newPage();
+  await rp.goto("http://localhost:4173/");
+  await rp.locator(".onboard").waitFor();
+  await rp.waitForTimeout(4500);
+  check("reduced motion: the headline stays still", (await rp.locator(".cycle-fonts").evaluate((e) => e.style.fontFamily)) === "" && (await rp.locator(".cycle-colors").evaluate((e) => e.style.color)) === "");
+  await rm.close();
+}
 await page.screenshot({ path: path.join(SHOTS, "ob-1.png") });
 
 // keyboard stays inside the flow
