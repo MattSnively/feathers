@@ -381,7 +381,7 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
 
   const element = h("div", { class: "onboard", role: "region", "aria-label": "Get started" },
     h("header", { class: "ob-head" },
-      h("div", { class: "brand" }, logoMark(38), h("span", { class: "brand-name" }, "Feathers")),
+      h("div", { class: "brand" }, logoMark(44), h("span", { class: "brand-name" }, "Feathers")),
       h("button", { type: "button", class: "ob-skip", onclick: handlers.onSkip }, handlers.skipLabel)),
     h("div", { class: "ob-body" }, h("div", { class: "ob-left" }, copy, example), content));
 

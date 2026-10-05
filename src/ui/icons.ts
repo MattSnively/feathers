@@ -1,5 +1,5 @@
 import { s } from "./dom";
-import { peacockMarkup } from "./logoMarkup";
+import { FAN_VIEWBOX, fanMarkup } from "./logoMarkup";
 
 /** 24x24 line icons. Paths are drawn with round caps at a 1.75 stroke so they read as one family. */
 const PATHS = {
@@ -47,9 +47,9 @@ export function icon(name: IconName, size = 20): SVGSVGElement {
   );
 }
 
-/** The wordmark glyph: a peacock with its tail fanned out in palette colors. */
+/** The wordmark glyph: a peacock's tail fanned out in palette colors. */
 export function logoMark(size = 28): SVGSVGElement {
-  const svg = s("svg", { viewBox: "0 0 32 32", width: size, height: size, "aria-hidden": "true", focusable: "false", class: "logo-mark" });
-  svg.innerHTML = peacockMarkup();
+  const svg = s("svg", { viewBox: FAN_VIEWBOX, width: size, height: size, "aria-hidden": "true", focusable: "false", class: "logo-mark" });
+  svg.innerHTML = fanMarkup();
   return svg;
 }

@@ -102,7 +102,7 @@ export function mountApp(root: HTMLElement, store: Store, opts: { showOnboarding
   const topbar = h("header", { class: "topbar" },
     // The way back to the start page from anywhere in the editor.
     h("button", { type: "button", class: "brand brand-home", title: "Back to the start page", "aria-label": "Feathers, back to the start page", onclick: () => launchOnboarding() },
-      logoMark(38), h("span", { class: "brand-name" }, "Feathers")),
+      logoMark(44), h("span", { class: "brand-name" }, "Feathers")),
     h("div", { class: "tool-tabs" },
       segmentedControl<Tool>(TOOLS, () => store.get().tool, (t) => store.setTool(t), { label: "I'm building for" })),
     schemaChip(store),
