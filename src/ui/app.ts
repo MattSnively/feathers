@@ -99,7 +99,7 @@ export function mountApp(root: HTMLElement, store: Store, opts: { showOnboarding
   let overlay: HTMLElement | null = null;
 
   const topbar = h("header", { class: "topbar" },
-    h("div", { class: "brand" }, logoMark(30), h("span", { class: "brand-name" }, "Feathers")),
+    h("div", { class: "brand" }, logoMark(38), h("span", { class: "brand-name" }, "Feathers")),
     h("div", { class: "tool-tabs" },
       segmentedControl<Tool>(TOOLS, () => store.get().tool, (t) => store.setTool(t), { label: "I'm building for" })),
     schemaChip(store),

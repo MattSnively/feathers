@@ -49,7 +49,7 @@ const nextBtn = () => page.getByRole("button", { name: "Continue" });
 check("first visit shows the flow", await ob.isVisible());
 check("heading is 'Customize your colors and fonts before you even start your dashboard.' and has focus", (await h1()) === "Customize your colors and fonts before you even start your dashboard." && (await activeTag()) === "H1");
 check("no step navigation in the header", (await page.locator(".ob-head nav, .ob-step").count()) === 0);
-check("subhead explains the output", (await page.locator(".ob-lead").innerText()).startsWith("Import a custom .json file directly into Tableau or Power BI"));
+check("subhead explains the output", (await page.locator(".ob-lead").innerText()).startsWith("Import custom .json and .tps files directly into Tableau or Power BI with Feathers. Your styles made easy."));
 const actions = await page.locator(".ob-actions").boundingBox(); const firstCard = await page.locator(".ob-own").boundingBox();
 check("Continue sits under the header text, above the choices and in view", actions.y + actions.height < 400 && (await page.locator(".ob-actions").getByRole("button", { name: "Continue to fonts" }).isVisible()), JSON.stringify(actions));
 check("the editor behind the flow is inert", await page.locator(".app").evaluate((e) => e.inert === true));

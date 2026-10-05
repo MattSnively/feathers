@@ -32,7 +32,6 @@
   --topbar-h: 64px;
   --rail-w: 76px;
   --panel-w: clamp(310px, 24vw, 380px);
-  --logo-fg: #ffffff;
   color-scheme: light;
 }
 
@@ -53,7 +52,6 @@
     --pill-ink: #0f1218;
     --danger: #ff8d7a;
     --badge: #ff7a45;
-    --logo-fg: #0f1218;
     --shadow-pop: 0 18px 48px rgba(0, 0, 0, 0.55);
     color-scheme: dark;
   }

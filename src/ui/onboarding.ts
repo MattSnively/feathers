@@ -27,7 +27,7 @@ const PALETTES = [
 const STEP_COUNT = 3;
 
 const HEADINGS: [string, string][] = [
-  ["Customize your colors and fonts before you even start your dashboard.", "Import a custom .json file directly into Tableau or Power BI with Feathers"],
+  ["Customize your colors and fonts before you even start your dashboard.", "Import custom .json and .tps files directly into Tableau or Power BI with Feathers. Your styles made easy."],
   ["Pick a font", "Choose one font. We'll tell you whether it works in Power BI, Tableau or both. You can change it later."],
   ["Name your theme", "This names your downloaded files. You can rename it any time."],
 ];
@@ -378,7 +378,7 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
 
   const element = h("div", { class: "onboard", role: "region", "aria-label": "Get started" },
     h("header", { class: "ob-head" },
-      h("div", { class: "brand" }, logoMark(30), h("span", { class: "brand-name" }, "Feathers")),
+      h("div", { class: "brand" }, logoMark(38), h("span", { class: "brand-name" }, "Feathers")),
       h("button", { type: "button", class: "ob-skip", onclick: handlers.onSkip }, "Skip for now")),
     h("div", { class: "ob-body" }, h("div", { class: "ob-left" }, copy, example), content));
 

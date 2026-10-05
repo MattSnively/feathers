@@ -1,4 +1,5 @@
 import { s } from "./dom";
+import { peacockMarkup } from "./logoMarkup";
 
 /** 24x24 line icons. Paths are drawn with round caps at a 1.75 stroke so they read as one family. */
 const PATHS = {
@@ -46,13 +47,9 @@ export function icon(name: IconName, size = 20): SVGSVGElement {
   );
 }
 
-/** The wordmark glyph: a single feather stroke. */
+/** The wordmark glyph: a peacock with its tail fanned out in palette colors. */
 export function logoMark(size = 28): SVGSVGElement {
-  return s(
-    "svg",
-    { viewBox: "0 0 32 32", width: size, height: size, "aria-hidden": "true", focusable: "false", class: "logo-mark" },
-    s("rect", { width: 32, height: 32, rx: 9, fill: "currentColor" }),
-    s("path", { d: "M8 25C8 14.5 14.5 8 25 8c0 10.5-6.5 17-17 17z", fill: "var(--logo-fg, #fff)" }),
-    s("path", { d: "M8 25L18 15", stroke: "currentColor", "stroke-width": 1.6, "stroke-linecap": "round" }),
-  );
+  const svg = s("svg", { viewBox: "0 0 32 32", width: size, height: size, "aria-hidden": "true", focusable: "false", class: "logo-mark" });
+  svg.innerHTML = peacockMarkup();
+  return svg;
 }
