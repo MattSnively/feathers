@@ -148,6 +148,21 @@ check("a Tableau-only font warns that Power BI will use Segoe UI", (await page.l
 await page.waitForFunction(() => /Tableau Medium/.test(getComputedStyle(document.querySelector(".ob-pv-frame .pv-title")).fontFamily));
 await page.locator(".ob-font", { hasText: "Verdana" }).first().click();
 check("a shared font says it works in both", (await page.locator(".ob-font-notice").innerText()).includes("works in both Power BI and Tableau"));
+
+// Picking fonts must never move the grid: the alert box is sized for the longest message.
+for (const width of [1000, 1440]) {
+  await page.setViewportSize({ width, height: 900 });
+  await page.waitForTimeout(200);
+  const gridTops = new Set(), heights = new Set();
+  for (const name of ["Arial", "Segoe UI Semibold", "Tableau Semibold", "DIN", "Consolas", "Verdana"]) {
+    await page.locator(".ob-font", { hasText: name }).first().click({ force: true });
+    await page.waitForTimeout(80);
+    const m = await page.evaluate(() => ({ top: Math.round(document.querySelector(".ob-fonts").getBoundingClientRect().top + document.querySelector(".onboard").scrollTop), h: Math.round(document.querySelector(".ob-font-notice").getBoundingClientRect().height) }));
+    gridTops.add(m.top); heights.add(m.h);
+  }
+  check(`${width}px: the font grid doesn't move when the alert changes`, gridTops.size === 1 && heights.size === 1, `tops ${[...gridTops]} heights ${[...heights]}`);
+}
+await page.setViewportSize({ width: 1920, height: 1080 });
 check("choosing a font marks it", (await page.locator(".ob-font", { hasText: "Verdana" }).first().getAttribute("aria-pressed")) === "true");
 await page.waitForFunction(() => /Verdana/.test(getComputedStyle(document.querySelector(".ob-pv-frame .pv-title")).fontFamily));
 check("the Power BI preview switches font", true);

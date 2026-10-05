@@ -277,11 +277,16 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
   // ---- Step 2: fonts --------------------------------------------------------------------------
 
   function fontsStep(): HTMLElement[] {
-    const notice = h("p", { class: "ob-font-notice", role: "status" });
+    // The box is sized for the longest message, so picking a font never moves the grid below it. A hidden copy
+    // of that message shares the same grid cell as the live text.
+    const longest = ALL_FONTS.map((f) => fontNotice(f).text).reduce((a, b) => (b.length > a.length ? b : a));
+    const live = h("span", { class: "ob-font-notice-live" });
+    const notice = h("p", { class: "ob-font-notice", role: "status" },
+      live, h("span", { class: "ob-font-notice-live ghost", "aria-hidden": "true" }, longest));
     const showNotice = (name: string) => {
       const n = fontNotice(name);
       notice.className = `ob-font-notice ${n.kind}`;
-      notice.replaceChildren(icon(n.kind === "both" ? "check" : "info", 18), n.text);
+      live.replaceChildren(icon(n.kind === "both" ? "check" : "info", 18), n.text);
     };
     const buttons = ALL_FONTS.map((name) => {
       const st = fontStyle(name);
