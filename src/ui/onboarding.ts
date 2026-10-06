@@ -8,7 +8,7 @@ import type { Theme } from "../model/theme";
 import { fontStyle } from "../preview/style";
 import { DESIGN_WIDTH } from "../preview/zoom";
 import { blank } from "../presets/blank";
-import { dark2, midnight, okabeIto, playfair, presets, tableau10, tolMuted } from "../presets";
+import { dark2, midnight, okabeIto, playfair, playfairClassic, presets, tableau10, tolMuted } from "../presets";
 import { COLOR_LINKS } from "./colorLinks";
 import { h } from "./dom";
 import { icon, logoMark } from "./icons";
@@ -17,6 +17,7 @@ import { powerBiPreview } from "./preview/powerbi";
 
 const PALETTES = [
   { id: "playfair", title: "Playfair Data", blurb: "Kingfisher blue with an orange feather accent, from the Playfair Data brand.", theme: playfair },
+  { id: "playfairClassic", title: "Playfair Classic", blurb: "Red, deep teal and orange, from the earlier Playfair Data theme.", theme: playfairClassic },
   { id: "okabe", title: "Okabe-Ito", blurb: "Eight colors designed to stay distinct for color-blind viewers.", theme: okabeIto },
   { id: "tol", title: "Paul Tol Muted", blurb: "Nine soft, balanced colors that are also color-blind safe.", theme: tolMuted },
   { id: "tableau10", title: "Tableau 10", blurb: "Tableau's familiar ten-color palette.", theme: tableau10 },
