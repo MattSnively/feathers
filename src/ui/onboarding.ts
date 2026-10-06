@@ -9,6 +9,7 @@ import { fontStyle } from "../preview/style";
 import { DESIGN_WIDTH } from "../preview/zoom";
 import { blank } from "../presets/blank";
 import { dark2, midnight, okabeIto, playfair, presets, tableau10, tolMuted } from "../presets";
+import { COLOR_LINKS } from "./colorLinks";
 import { h } from "./dom";
 import { icon, logoMark } from "./icons";
 import type { Edit } from "./preview/chart";
@@ -271,7 +272,9 @@ export function buildOnboarding(initial: Theme, handlers: OnboardingHandlers): {
 
     renderTiles();
     syncSelection();
-    return [own, h("h2", { class: "ob-sub" }, "Or start from a palette"), palettes];
+    const learn = h("ul", { class: "ob-links" }, ...COLOR_LINKS.map((l) =>
+      h("li", {}, h("a", { href: l.href, target: "_blank", rel: "noopener noreferrer" }, l.title, h("span", { class: "sr-only" }, " (opens in a new tab)")), h("span", {}, l.blurb))));
+    return [own, h("h2", { class: "ob-sub" }, "Or start from a palette"), palettes, h("h2", { class: "ob-sub" }, "Learn more about color"), learn];
   }
 
   // ---- Step 2: fonts --------------------------------------------------------------------------

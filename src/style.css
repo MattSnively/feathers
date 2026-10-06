@@ -464,6 +464,13 @@ dialog.drawer::backdrop { background: rgba(10, 12, 18, 0.55); }
 .ob-lead { margin: 16px 0 24px; max-width: 44ch; font-size: clamp(16px, 1.4vw, 21px); line-height: 1.5; color: var(--ink-2); }
 .ob-sub { margin: 36px 0 14px; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
 
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.ob-links { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.ob-links li { display: grid; gap: 2px; }
+.ob-links a { font-weight: 700; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.ob-links a:hover { text-decoration-thickness: 2px; }
+.ob-links li > span:not(.sr-only) { color: var(--ink-2); font-size: 14px; line-height: 1.4; }
+
 .ob-card { border: 2px solid var(--border); border-radius: 24px; background: var(--surface); }
 .ob-card.is-selected, .ob-palette[aria-pressed="true"] { border-color: var(--ink); }
 .ob-own { display: flex; flex-direction: column; gap: 16px; padding: 24px; }
