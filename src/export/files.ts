@@ -1,15 +1,17 @@
 import type { Theme } from "../model/theme";
 import { ThemeError } from "../model/validate";
 import type { Tool } from "../state/store";
+import { exportCss } from "./css";
 import { exportPowerBi } from "./powerbi";
 import { exportTableauTheme } from "./tableauTheme";
 import { exportTableauTps } from "./tableauTps";
 
-export type ExportId = "powerbi" | "tableau-theme" | "tableau-tps";
+export type ExportId = "powerbi" | "tableau-theme" | "tableau-tps" | "css";
 
 export interface ExportSpec {
   id: ExportId;
-  tool: Tool;
+  /** Null for exports that serve no single tool (the CSS file), so no card is badged "Your tool". */
+  tool: Tool | null;
   label: string;
   /** What the user actually does with this file; shown on the export card. */
   hint: string;
@@ -60,6 +62,15 @@ export const EXPORTS: readonly ExportSpec[] = [
     filename: (s) => `feathers-${s}.tps`,
     mime: "application/xml",
     build: exportTableauTps,
+  },
+  {
+    id: "css",
+    tool: null,
+    label: "Global CSS",
+    hint: "Colors, fonts and ready-made rules as CSS variables, for Fabric data apps and embedded HTML pages.",
+    filename: (s) => `${s}.css`,
+    mime: "text/css",
+    build: exportCss,
   },
 ];
 

@@ -126,6 +126,42 @@ export const GUIDES: Record<ExportId, Guide> = {
       },
     ],
   },
+
+  css: {
+    title: "Use the stylesheet in a data app or HTML page",
+    requires: "A page or data app where you can add a stylesheet link and set a class on an element.",
+    steps: [
+      "Download {file} with the button above and put it next to your page's HTML file, or in your app's static assets folder.",
+      "In the page's <head>, add <link rel=\"stylesheet\" href=\"{file}\">. Use the path your app serves the file from.",
+      "Add class=\"feathers-root\" to the element that wraps your content, such as <body> or a <div>. Text, headings and links inside it pick up the theme. Anything outside it is left alone.",
+      "Use the helper classes for the pieces you need: feathers-card, feathers-card-title, feathers-kpi, feathers-label, feathers-table, feathers-good, feathers-neutral, feathers-bad and feathers-series-1, 2, 3 and so on.",
+      "In your own CSS or chart code, use the colors with var(--feathers-cat-1), var(--feathers-bg-container), var(--feathers-text-primary) and the other variables listed at the top of the file.",
+    ],
+    verify:
+      "Reload the page. The wrapped area has your page background, the body text uses your body font, and a <div class=\"feathers-card\"> shows your container background with a border.",
+    troubleshooting: [
+      {
+        problem: "Nothing changed.",
+        fix: "The link's path is wrong or the browser cached the old file. Open the file's URL directly to check it loads, then do a hard refresh.",
+      },
+      {
+        problem: "Text isn't themed.",
+        fix: "It sits outside the element with class feathers-root. Move the class up to a wrapper around all of your content.",
+      },
+      {
+        problem: "The fonts look different on another computer.",
+        fix: "The file names the Power BI font first, then common fallbacks. If the viewer doesn't have that font, the browser uses the next one, so Segoe UI and DIN look different on Mac and Linux.",
+      },
+      {
+        problem: "My own styles override the theme.",
+        fix: "Rules in your page that target the same element and load later win. Link the Feathers file first, or use the var(--feathers-…) variables in your own rules.",
+      },
+      {
+        problem: "I need a color the helper classes don't cover.",
+        fix: "Use the variables directly in your own CSS, for example background: var(--feathers-cat-3).",
+      },
+    ],
+  },
 };
 
 /** Tells the user which downloads matter for the tool they selected. */

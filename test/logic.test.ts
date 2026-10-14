@@ -38,7 +38,7 @@ describe("slugify", () => {
 describe("export registry", () => {
   it("names files per tool and never as Preferences.tps", () => {
     const names = EXPORTS.map((e) => e.filename("my-theme"));
-    expect(names).toEqual(["my-theme.powerbi.json", "my-theme.tableau.json", "feathers-my-theme.tps"]);
+    expect(names).toEqual(["my-theme.powerbi.json", "my-theme.tableau.json", "feathers-my-theme.tps", "my-theme.css"]);
     expect(names).not.toContain("Preferences.tps");
   });
 
