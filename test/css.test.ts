@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { exportCss } from "../src/export/css";
 import { presets, playfair } from "../src/presets";
+import { cssSampleDoc } from "../src/ui/preview/cssSample";
 
 const declarations = (css: string) => [...css.matchAll(/^\s+--feathers-([\w-]+): (.+);$/gm)];
 
@@ -45,5 +46,22 @@ describe("exportCss", () => {
   it("is deterministic and rejects an invalid theme", () => {
     expect(exportCss(playfair)).toBe(exportCss(playfair));
     expect(() => exportCss({ ...playfair, text: { ...playfair.text, primary: "nope" } })).toThrow(/6-digit hex/);
+  });
+});
+
+describe("cssSampleDoc", () => {
+  it("inlines the stylesheet and uses only classes that stylesheet defines", () => {
+    const css = exportCss(playfair);
+    const doc = cssSampleDoc(css);
+    expect(doc).toContain(css);
+    const used = new Set([...doc.slice(css.length).matchAll(/class="([^"]+)"/g)].flatMap((m) => m[1]!.split(" ")));
+    for (const cls of used) expect(css, cls).toContain(`.${cls}`);
+  });
+
+  it("cannot be broken out of the <style> element by a theme name", () => {
+    const doc = cssSampleDoc(exportCss({ ...playfair, name: "x</style><script>alert(1)</script>" }));
+    expect(doc.match(/<\/style/gi)).toHaveLength(1);
+    // The name stays in the stylesheet comment, which is inert inside <style>; only the closing tag matters.
+    expect(doc.indexOf("<script>")).toBeLessThan(doc.indexOf("</style"));
   });
 });

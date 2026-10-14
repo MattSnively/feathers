@@ -299,6 +299,9 @@ check("Power BI file carries the UI's settings", pbiJson.name === "QA Theme #1" 
 const tabl = await dl("Tableau theme");
 const tabJson = JSON.parse(tabl.text);
 check("Tableau theme validates vs its schema", validateTab(tabJson) === true, JSON.stringify(validateTab.errors?.slice(0, 2)));
+const sample = page.locator("dialog .export-card", { hasText: "Global CSS" }).frameLocator("iframe.css-sample");
+check("CSS card previews a sample styled by the stylesheet", (await sample.locator(".feathers-kpi").evaluate((el) => getComputedStyle(el).color)) === "rgb(10, 55, 70)");
+await page.screenshot({ path: path.join(SHOTS, "e2e-css-card.png") });
 const tps = await dl("Tableau palettes");
 const css = await dl("Global CSS");
 check("CSS file has a :root token block and uses the theme's colors", /^:root \{/m.test(css.text) && css.text.includes("--feathers-cat-1: #0A3746;"));

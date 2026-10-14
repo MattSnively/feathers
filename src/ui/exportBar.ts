@@ -4,6 +4,7 @@ import { fillFile, GUIDES, WHICH_FILES } from "../guides/content";
 import type { Store } from "../state/store";
 import { h, rebuild } from "./dom";
 import { copyText, downloadText } from "./download";
+import { cssSampleDoc } from "./preview/cssSample";
 
 export function buildExportBar(store: Store): HTMLElement {
   const root = h("section", { class: "export-bar", "aria-labelledby": "export-title" });
@@ -31,6 +32,10 @@ export function buildExportBar(store: Store): HTMLElement {
       h("p", { class: "hint" }, spec.hint),
       h("p", { class: "filename" }, result.filename),
       result.ok ? null : h("p", { class: "error", role: "alert" }, result.error),
+      // sandbox="" blocks scripts and forms; the document is generated here, but the theme name is user text.
+      spec.id === "css" && result.ok
+        ? h("iframe", { class: "css-sample", sandbox: "", title: "Sample page styled by this stylesheet", srcdoc: cssSampleDoc(result.content) })
+        : null,
       h(
         "div",
         { class: "actions" },
