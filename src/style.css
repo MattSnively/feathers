@@ -619,3 +619,59 @@ dialog.drawer::backdrop { background: rgba(10, 12, 18, 0.55); }
 }
 .cycle-btn { transition: background-color 0.7s ease, border-color 0.7s ease, filter 0.12s; }
 @media (prefers-reduced-motion: reduce) { .cycle-btn { transition: none; } }
+
+/* ==========================================================================
+   Example sheet (PDF). Fixed neutral colors, not the app tokens, so dark mode can't leak onto paper.
+   Built off-screen at page width; the print rules below hide the app and show only the sheet.
+   ========================================================================== */
+
+@page { size: landscape; margin: 0.5in; }
+
+.sheet-host { position: absolute; left: -10000px; top: 0; width: 960px; }
+.sheet { font: 11px/1.45 var(--font); color: #14161a; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.sheet code { font-family: var(--mono); font-size: 11px; }
+.sheet h1 { font-size: 20px; line-height: 1.2; }
+.sheet h2 { font-size: 13px; margin: 0 0 4px; }
+.sheet-page { width: 960px; break-after: page; }
+.sheet-page:last-child { break-after: auto; }
+.sheet-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid #c9ced7; }
+.sheet-head p { margin: 2px 0 0; color: #4a5160; font-size: 12px; }
+.sheet-head .sheet-made { font-size: 10px; color: #6f7786; white-space: nowrap; }
+.sheet-lede { margin: 0 0 10px; font-size: 12px; color: #4a5160; }
+.sheet-blurb { margin: 0 0 6px; color: #4a5160; }
+.sheet-group { margin-bottom: 8px; break-inside: avoid; }
+.sheet-swatches { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px 10px; }
+.sheet-swatch { display: flex; gap: 8px; align-items: flex-start; break-inside: avoid; }
+.sheet-chip { flex: none; width: 36px; height: 36px; border-radius: 6px; border: 1px solid rgba(0, 0, 0, 0.22); }
+.sheet-chip.small { width: 16px; height: 16px; border-radius: 4px; }
+.sheet-swatch-text { display: grid; gap: 1px; min-width: 0; }
+.sheet-swatch-text span { color: #4a5160; font-size: 10px; }
+.sheet-contrast.low { color: #14161a; font-weight: 700; }
+.sheet-sims { display: grid; gap: 4px; }
+.sheet-sim { display: flex; align-items: center; gap: 10px; }
+.sheet-sim > span:first-child { flex: none; width: 190px; color: #4a5160; }
+.sheet-strip { display: flex; gap: 3px; }
+.sheet-findings { margin: 0 0 8px; padding-left: 16px; display: grid; gap: 4px; }
+.sheet-findings .sheet-strip { display: inline-flex; vertical-align: middle; margin-left: 4px; }
+
+.sheet-type { width: 100%; border-collapse: collapse; }
+.sheet-type th, .sheet-type td { padding: 8px 10px; border-bottom: 1px solid #dfe2e8; text-align: left; vertical-align: middle; }
+.sheet-type th { color: #4a5160; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+.sheet-stack { color: #6f7786; font-size: 9.5px; }
+.sheet-sample { color: #14161a; white-space: nowrap; line-height: 1.2; }
+
+.sheet-dash { position: relative; margin: 0 auto 10px; overflow: hidden; border: 1px solid #c9ced7; }
+.sheet-frame { position: relative; transform-origin: 0 0; margin: 0; }
+.sheet-marker { position: absolute; z-index: 5; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #14161a; color: #fff; border: 2px solid #fff; font: 700 11px/1 var(--font); }
+.sheet-marker.static { position: static; flex: none; }
+.sheet-legend { list-style: none; margin: 0; padding: 0; columns: 3; column-gap: 20px; }
+.sheet-legend li { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; break-inside: avoid; }
+.sheet-legend-colors { display: flex; flex-wrap: wrap; gap: 2px 8px; }
+.sheet-legend-color { display: inline-flex; align-items: center; gap: 4px; }
+.sheet-legend-detail { color: #4a5160; font-size: 10px; }
+
+@media print {
+  body > *:not(.sheet-host) { display: none !important; }
+  .sheet-host { position: static; width: auto; }
+  html, body { background: #fff; }
+}

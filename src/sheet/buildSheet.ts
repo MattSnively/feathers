@@ -65,7 +65,7 @@ export function buildSheet(theme: Theme): SheetData {
   const groups: SwatchGroup[] = [
     {
       title: "Data colors",
-      blurb: "Series take these in order, so color 1 is the first series in every chart. Light colors are fine as fills but thin on small marks.",
+      blurb: "Series take these in order, so color 1 is the first series in every chart. Light colors are fine as fills but thin on small marks. Contrast is against the chart background; graphics need 3:1.",
       swatches: palette.categorical.map((hex, i) => ({
         key: `cat-${i}`,
         label: `Color ${i + 1}`,
@@ -75,25 +75,19 @@ export function buildSheet(theme: Theme): SheetData {
       })),
     },
     {
-      title: "Sequential",
-      blurb: "A gradient for values that run from low to high. The tools interpolate between the two ends.",
+      title: "Sequential and diverging",
+      blurb: "Sequential runs from low to high; the tools interpolate between its two ends. Diverging is for values that matter on both sides of a midpoint, such as above and below target.",
       swatches: [
-        { key: "sequential-0", label: "Low end", hex: palette.sequential[0], role: "Lowest value", contrast: null },
-        { key: "sequential-1", label: "High end", hex: palette.sequential[1], role: "Highest value", contrast: null },
-      ],
-    },
-    {
-      title: "Diverging",
-      blurb: "For values that matter on both sides of a midpoint, such as above and below target.",
-      swatches: [
-        { key: "diverging-0", label: "Low end", hex: palette.diverging[0], role: "Most below the midpoint", contrast: null },
-        { key: "diverging-1", label: "Center", hex: palette.diverging[1], role: "The midpoint", contrast: null },
-        { key: "diverging-2", label: "High end", hex: palette.diverging[2], role: "Most above the midpoint", contrast: null },
+        { key: "sequential-0", label: "Sequential low", hex: palette.sequential[0], role: "Lowest value", contrast: null },
+        { key: "sequential-1", label: "Sequential high", hex: palette.sequential[1], role: "Highest value", contrast: null },
+        { key: "diverging-0", label: "Diverging low", hex: palette.diverging[0], role: "Most below the midpoint", contrast: null },
+        { key: "diverging-1", label: "Diverging center", hex: palette.diverging[1], role: "The midpoint", contrast: null },
+        { key: "diverging-2", label: "Diverging high", hex: palette.diverging[2], role: "Most above the midpoint", contrast: null },
       ],
     },
     {
       title: "Status",
-      blurb: "Good, neutral and bad, used for KPI arrows, waterfall and variance charts.",
+      blurb: "Good, neutral and bad, used for KPI arrows, waterfall and variance charts. Contrast is against the chart background; graphics need 3:1.",
       swatches: (["good", "neutral", "bad"] as const).map((k) => ({
         key: `status-${k}`,
         label: capitalize(k),
@@ -104,7 +98,7 @@ export function buildSheet(theme: Theme): SheetData {
     },
     {
       title: "Text",
-      blurb: "Three levels of emphasis. Text needs 4.5:1 against its background (WCAG AA).",
+      blurb: "Three levels of emphasis. Text needs 4.5:1 (WCAG AA); contrast is against the chart or page background, whichever is lower.",
       swatches: (
         [
           ["primary", "Primary", "Titles and values"],
