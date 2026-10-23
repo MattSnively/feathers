@@ -283,7 +283,7 @@ await closeDrawer();
 await page.locator("#theme-name").fill("QA Theme #1");
 await openDrawer();
 check("drawer opens as a modal sheet on the right", await page.locator("dialog.drawer").evaluate((d) => d.getBoundingClientRect().right >= innerWidth - 1 && d.getBoundingClientRect().width <= 740));
-check("filenames follow the slug", (await page.locator("dialog .filename").allInnerTexts()).join("|") === "qa-theme-1.powerbi.json|qa-theme-1.tableau.json|feathers-qa-theme-1.tps|qa-theme-1.css");
+check("filenames follow the slug", (await page.locator("dialog .filename").allInnerTexts()).join("|") === "qa-theme-1.powerbi.json|qa-theme-1.tableau.json|feathers-qa-theme-1.tps|qa-theme-1.css|qa-theme-1-example-sheet.pdf");
 check("Advanced offers View file", (await page.locator("dialog").getByRole("button", { name: "View file" }).count()) === 4);
 const dl = async (title) => {
   const card = page.locator("dialog .export-card", { hasText: title });
@@ -302,6 +302,29 @@ check("Tableau theme validates vs its schema", validateTab(tabJson) === true, JS
 const sample = page.locator("dialog .export-card", { hasText: "Global CSS" }).frameLocator("iframe.css-sample");
 check("CSS card previews a sample styled by the stylesheet", (await sample.locator(".feathers-kpi").evaluate((el) => getComputedStyle(el).color)) === "rgb(10, 55, 70)");
 await page.screenshot({ path: path.join(SHOTS, "e2e-css-card.png") });
+await page.locator("dialog .export-card", { hasText: "Example sheet" }).getByRole("button", { name: "Create PDF" }).click();
+await page.locator(".sheet-marker").first().waitFor();
+const sheet = await page.evaluate(() => {
+  const host = document.querySelector(".sheet-host");
+  return {
+    text: host.textContent,
+    pages: [...host.querySelectorAll(".sheet-page")].map((p) => p.offsetHeight),
+    markers: host.querySelectorAll(".sheet-frame .sheet-marker").length,
+    legend: host.querySelectorAll(".sheet-legend li").length,
+    title: document.title,
+  };
+});
+check("sheet: hex codes and theme name are text on the page", sheet.text.includes("#0A3746") && sheet.text.includes("QA Theme #1") && sheet.text.includes("Segoe UI Semibold"));
+check("sheet: five pages, each fits one landscape page (720px)", sheet.pages.length === 5 && sheet.pages.every((h) => h <= 720), JSON.stringify(sheet.pages));
+check("sheet: every legend entry has a marker on the dashboard", sheet.markers === sheet.legend && sheet.legend >= 8, `${sheet.markers} markers, ${sheet.legend} legend`);
+check("sheet: print dialog proposes a good file name", sheet.title === "qa-theme-1-example-sheet", sheet.title);
+await page.emulateMedia({ media: "print" });
+check("sheet: print layout hides the app", (await page.evaluate(() => getComputedStyle(document.getElementById("app")).display)) === "none");
+const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
+check("sheet: Chromium prints it to a PDF", pdf.subarray(0, 5).toString() === "%PDF-" && pdf.length > 20000, `${pdf.length} bytes`);
+await page.emulateMedia({ media: null });
+await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
+check("sheet: cleans up after printing", (await page.locator(".sheet-host").count()) === 0 && (await page.title()) !== "qa-theme-1-example-sheet");
 const tps = await dl("Tableau palettes");
 const css = await dl("Global CSS");
 check("CSS file has a :root token block and uses the theme's colors", /^:root \{/m.test(css.text) && css.text.includes("--feathers-cat-1: #0A3746;"));

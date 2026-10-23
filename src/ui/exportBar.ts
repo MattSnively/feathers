@@ -1,10 +1,13 @@
-import { EXPORTS, runExport, type ExportId, type ExportSpec } from "../export/files";
+import { EXPORTS, runExport, slugify, type ExportId, type ExportSpec } from "../export/files";
 import { tableauPaletteBlocks } from "../export/tableauTps";
 import { fillFile, GUIDES, WHICH_FILES } from "../guides/content";
+import { ThemeError } from "../model/validate";
+import { buildSheet } from "../sheet/buildSheet";
 import type { Store } from "../state/store";
 import { h, rebuild } from "./dom";
 import { copyText, downloadText } from "./download";
 import { cssSampleDoc } from "./preview/cssSample";
+import { printSheet } from "./sheet/print";
 
 export function buildExportBar(store: Store): HTMLElement {
   const root = h("section", { class: "export-bar", "aria-labelledby": "export-title" });
@@ -71,6 +74,37 @@ export function buildExportBar(store: Store): HTMLElement {
     );
   };
 
+  /** Not a file export: the sheet is made by printing, so it gets its own card instead of an ExportSpec. */
+  const sheetCard = () => {
+    const { theme } = store.get();
+    const slug = slugify(theme.name);
+    let error: string | null = null;
+    try {
+      buildSheet(theme);
+    } catch (e) {
+      if (!(e instanceof ThemeError)) throw e;
+      error = e.message;
+    }
+    return h(
+      "article",
+      { class: "export-card" },
+      h("h3", {}, "Example sheet"),
+      h("p", { class: "hint" }, "A PDF with every color and its hex code, your fonts and sizes, and a sample dashboard showing where each is used. Pick Save as PDF in the print dialog."),
+      h("p", { class: "filename" }, `${slug}-example-sheet.pdf`),
+      error ? h("p", { class: "error", role: "alert" }, error) : null,
+      h("div", { class: "actions" }, h("button", {
+        type: "button",
+        class: "primary",
+        disabled: error !== null,
+        "data-key": "sheet-download",
+        onclick: () => {
+          status.textContent = "Opening the print dialog. Choose Save as PDF as the destination.";
+          void printSheet(theme, slug);
+        },
+      }, "Create PDF")),
+    );
+  };
+
   const guide = (spec: ExportSpec) => {
     const g = GUIDES[spec.id];
     const filename = runExport(spec, store.get().theme).filename;
@@ -105,7 +139,7 @@ export function buildExportBar(store: Store): HTMLElement {
     rebuild(root, () => [
       h("h2", { id: "export-title" }, "Download your theme"),
       h("p", { class: "hint which-files" }, WHICH_FILES[tool]),
-      h("div", { class: "export-cards" }, ...EXPORTS.map(card)),
+      h("div", { class: "export-cards" }, ...EXPORTS.map(card), sheetCard()),
       status,
       h("h2", { class: "guides-title" }, "How to import"),
       h("div", { class: "guides" }, ...ordered.map(guide)),
