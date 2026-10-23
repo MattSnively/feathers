@@ -13,7 +13,7 @@ const SANS_FALLBACKS = ["system-ui", "-apple-system", '"Helvetica Neue"', "Arial
 // Power BI's dropdown labels the weights "Segoe UI Light" and "Segoe (Bold)"; CSS only knows the family.
 const cssFamily = (name: string) => (name === "Segoe (Bold)" ? "Segoe UI" : name);
 
-function fontStack(name: string): string {
+export function fontStack(name: string): string {
   const generic: Generic = SERIF.has(name) ? "serif" : MONO.has(name) ? "monospace" : "sans-serif";
   const fallbacks = generic === "sans-serif" ? SANS_FALLBACKS : [];
   return [`"${cssFamily(name)}"`, ...fallbacks, generic].join(", ");
