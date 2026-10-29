@@ -1,6 +1,7 @@
 import { analyzeTheme } from "../a11y/analyze";
-import { ALL_FONTS, applyFont, currentFont, fontLabel, fontNotice, type FontRole } from "../model/fonts";
+import { ALL_FONTS, applyFont, POWER_BI_FONTS, currentFont, fontLabel, fontNotice, type FontRole } from "../model/fonts";
 import type { LineStyle, Theme } from "../model/theme";
+import { resolveTextStyle, TEXT_SIZE, TEXT_STYLES, type TextClass, type TextStyle, type TextWeight } from "../model/textStyles";
 import type { Store } from "../state/store";
 import { buildA11yPanel } from "./a11yPanel";
 import { h, rebuild } from "./dom";
@@ -24,6 +25,11 @@ const PALETTE_KINDS = [
   ["categorical", "Categorical"],
   ["sequential", "Sequential"],
   ["diverging", "Diverging"],
+] as const;
+
+const TEXT_VIEWS = [
+  ["one", "One font"],
+  ["styles", "Each style"],
 ] as const;
 
 const LINE_STYLES = [
@@ -59,6 +65,8 @@ export function buildSidebar(store: Store): { rail: HTMLElement; panel: HTMLElem
   let paletteKind: PaletteKind = "categorical";
   const selected: Record<PaletteKind, number> = { categorical: 0, sequential: 0, diverging: 0 };
   let focusKey: string | null = null;
+  // Local to the Text tab and independent of Beginner/Advanced. A theme that already has overrides opens on them.
+  let textView: "one" | "styles" = Object.keys(store.get().theme.textStyles ?? {}).length > 0 ? "styles" : "one";
 
   const a11y = buildA11yPanel(store);
 
@@ -222,14 +230,79 @@ export function buildSidebar(store: Store): { rail: HTMLElement; panel: HTMLElem
     return [field, notice];
   }
 
+  /** Sets or clears one style's overrides, dropping empty entries so an untouched theme stays free of textStyles. */
+  function setStyle(id: TextClass, patch: { [K in keyof TextStyle]?: TextStyle[K] | undefined }, kind: "value" | "structure" = "value") {
+    store.updateTheme((t) => {
+      const next: Record<string, unknown> = { ...t.textStyles?.[id], ...patch };
+      for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
+      const styles = { ...t.textStyles };
+      if (Object.keys(next).length > 0) styles[id] = next as TextStyle;
+      else delete styles[id];
+      if (Object.keys(styles).length > 0) t.textStyles = styles;
+      else delete t.textStyles;
+    }, kind);
+  }
+
+  const WEIGHTS: readonly string[] = ["", "normal", "bold"];
+  const weightLabel = (w: string) => (w === "" ? "Default" : w === "bold" ? "Bold" : "Regular");
+
+  /** One Power BI text style: font, size and weight, each falling back to the theme's body or title setting. */
+  function styleRow(id: TextClass, label: string, use: string): HTMLElement {
+    const { theme } = store.get();
+    const own = theme.textStyles?.[id];
+    const inherited = resolveTextStyle({ ...theme, textStyles: undefined }, id);
+    const fontDefault = inherited ? `Theme default (${inherited.font})` : "Power BI default";
+    // Called after every edit so Reset appears and disappears without rebuilding the row (which would drop typing focus).
+    const syncReset = () => { reset.hidden = !store.get().theme.textStyles?.[id]; };
+    const apply = (patch: Partial<TextStyle>) => { setStyle(id, patch); syncReset(); };
+    const reset = h("button", {
+      type: "button", class: "btn ghost", hidden: !own,
+      onclick: () => setStyle(id, { font: undefined, size: undefined, weight: undefined }, "structure"),
+    }, "Reset");
+    const size = h("input", {
+      type: "number", class: "style-size", min: String(TEXT_SIZE.min), max: String(TEXT_SIZE.max), step: "1",
+      value: own?.size !== undefined ? String(own.size) : "", placeholder: inherited ? String(inherited.size) : "Default",
+      "aria-label": `${label} size in points`,
+      oninput: () => {
+        const n = Number(size.value);
+        if (size.value === "") apply({ size: undefined });
+        else if (Number.isInteger(n) && n >= TEXT_SIZE.min && n <= TEXT_SIZE.max) apply({ size: n });
+      },
+    });
+    return h("div", { class: "style-row", "data-style": id },
+      h("div", { class: "style-head" }, h("strong", {}, label), h("span", { class: "aside" }, use), reset),
+      selectField("Font", ["", ...POWER_BI_FONTS], own?.font ?? "", (v) => apply({ font: v || undefined }),
+        { key: `style-${id}`, label: (v) => (v === "" ? fontDefault : v) }),
+      h("div", { class: "style-pair" },
+        h("div", { class: "field" }, h("label", {}, "Size (pt)"), size),
+        selectField("Weight", WEIGHTS, own?.weight ?? "", (v) => apply({ weight: (v || undefined) as TextWeight | undefined }), { label: weightLabel })));
+  }
+
   function textTab(): Node[] {
     const { theme, tool, mode } = store.get();
+    const overrides = Object.keys(theme.textStyles ?? {}).length;
+    // The toggle only picks a view: overrides keep applying either way, so say so rather than hide them.
+    const toggle = tool === "powerbi"
+      ? section("Fonts", null,
+          segmentedControl(TEXT_VIEWS, () => textView, (v) => { textView = v; render(); }, { label: "Font controls", class: "wide" }),
+          overrides > 0 && textView === "one"
+            ? h("p", { class: "hint" }, `${overrides} ${overrides === 1 ? "style has its" : "styles have their"} own settings, which still apply. `,
+                h("button", { type: "button", class: "btn ghost", onclick: () => store.updateTheme((t) => { delete t.textStyles; }, "structure") }, "Clear them"))
+            : null)
+      : null;
+    if (tool === "powerbi" && textView === "styles") {
+      return [toggle!,
+        section("Styles", "Power BI text classes",
+          hint("Leave a field on its default to follow your body or title settings. Styles you don't touch keep Power BI's own look. Color comes from the text colors."),
+          ...TEXT_STYLES.map((s) => styleRow(s.id, s.label, s.use)))];
+    }
     if (mode === "beginner") {
-      return [section("Font", "All text",
+      return [...(toggle ? [toggle] : []), section("Font", "All text",
         ...fontField("body", "font-body", true),
         hint("One font is used for all text, in both tools. Advanced sets titles and sizes separately."))];
     }
     return [
+      ...(toggle ? [toggle] : []),
       section("Body", "Labels, axes, tables",
         ...fontField("body", "font-body", false),
         sliderField("Font size", theme.sizes.body, { min: 8, max: 24, unit: "pt", key: "size-body" }, (n) => store.updateTheme((t) => { t.sizes.body = n; }))),
@@ -329,11 +402,15 @@ export function buildSidebar(store: Store): { rail: HTMLElement; panel: HTMLElem
   }
 
   /** Switches to the right tab, selects the swatch if needed, and moves focus to the control. */
-  function reveal(key: string) {
+  function reveal(requested: string) {
+    let key = requested;
     const { mode, tool } = store.get();
     const target = tabFor(key);
     if (!target || !isAvailable(key, mode, tool)) return;
     tab = target;
+    // In the per-style view, the preview's font and size parts land on the style they draw with.
+    const STYLE_OF: Record<string, TextClass> = { "font-title": "title", "size-title": "title", "size-callout": "callout", "font-body": "label", "size-body": "label" };
+    if (target === "text" && tool === "powerbi" && textView === "styles" && STYLE_OF[key]) key = `style-${STYLE_OF[key]}`;
     const m = /^(cat|sequential|diverging)-(\d+)$/.exec(key);
     if (m) {
       paletteKind = m[1] === "cat" ? "categorical" : (m[1] as PaletteKind);

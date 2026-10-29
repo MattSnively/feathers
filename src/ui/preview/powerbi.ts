@@ -1,4 +1,5 @@
 import type { Theme } from "../../model/theme";
+import { resolveTextStyle, type TextClass } from "../../model/textStyles";
 import { calloutPx, cardStyle, css, fontStyle, px } from "../../preview/style";
 import { h, s } from "../dom";
 import { columnChart, lineChart, scatterChart, type Edit } from "./chart";
@@ -38,12 +39,21 @@ const TABLE = [
 ];
 
 export function powerBiPreview(theme: Theme, edit: Edit, pageName: PreviewPage = "overview"): HTMLElement {
-  const { palette, status, text, background, gridline, sizes } = theme;
-  const body = fontStyle(theme.fonts.powerBi.body);
-  const title = fontStyle(theme.fonts.powerBi.title);
+  const { palette, status, text, background, gridline } = theme;
+  // Each part draws with the Power BI text class it exports to, so per-style overrides show up here.
+  const look = (id: TextClass) => {
+    const r = resolveTextStyle(theme, id)!;
+    const f = fontStyle(r.font);
+    return { font: r.weight ? { ...f, weight: r.weight === "bold" ? 700 : 400 } : f, pt: r.size, bold: r.weight !== undefined };
+  };
+  const body = look("label").font;
+  const title = look("title").font;
+  // Table headers keep the body look until the header style is overridden; Power BI's own header default is not what a table uses.
+  const header = theme.textStyles?.header ? look("header") : null;
+  const callout = look("callout");
   const n = palette.categorical.length;
-  const bodyPx = px(sizes.body);
-  const titlePx = px(sizes.title);
+  const bodyPx = px(look("label").pt);
+  const titlePx = px(look("title").pt);
   const axis = { ...body, size: bodyPx * 0.85, color: text.secondary };
   const common = { gridline, zeroline: null, palette: palette.categorical, edit, text: axis };
 
@@ -56,7 +66,7 @@ export function powerBiPreview(theme: Theme, edit: Edit, pageName: PreviewPage =
   const kpi = (k: (typeof KPIS)[number]) =>
     card(
       edit(h("div", { style: css(body, bodyPx * 0.9, text.muted) }, k.label), "text-muted", "muted text color"),
-      edit(h("div", { class: "pv-kpi", style: css(title, calloutPx(sizes.callout), palette.categorical[0]!) }, k.value), "size-callout", "card value size"),
+      edit(h("div", { class: "pv-kpi", style: css(callout.font, calloutPx(callout.pt), palette.categorical[0]!) }, k.value), "size-callout", "card value size"),
       // The arrow carries direction, so the delta isn't communicated by color alone.
       edit(h("div", { style: css(body, bodyPx * 0.9, k.up ? status.good : status.bad) }, k.delta), k.up ? "status-good" : "status-bad", k.up ? "good color" : "bad color"),
     );
@@ -101,7 +111,7 @@ export function powerBiPreview(theme: Theme, edit: Edit, pageName: PreviewPage =
   const grid = `border-bottom:1px solid ${gridline.color}`;
   const table = h("table", { class: "pv-table" },
     h("thead", {}, h("tr", {}, ...["Region", "Sales", "Margin"].map((c) =>
-      edit(cell(c, `${css({ ...body, weight: 700 }, bodyPx, text.secondary)};${grid}`, "th"), "text-secondary", "secondary text color")))),
+      edit(cell(c, `${css(header ? (header.bold ? header.font : { ...header.font, weight: 700 }) : { ...body, weight: 700 }, header ? px(header.pt) : bodyPx, text.secondary)};${grid}`, "th"), "text-secondary", "secondary text color")))),
     h("tbody", {}, ...TABLE.map((row) => h("tr", {}, ...row.map((c) =>
       edit(cell(c, `${css(body, bodyPx, text.primary)};${grid}`, "td"), "font-body", "body font"))))));
 

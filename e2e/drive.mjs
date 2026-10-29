@@ -441,6 +441,40 @@ check("the palettes tab shows the .tps XML", (await page.locator(".code-text").f
 await page.locator(".code-toggle").click();
 check("Code panel closes", !(await page.locator(".code-panel").isVisible()));
 
+// ---- Per-style fonts (Text tab, Power BI) ---------------------------------------------------
+await reset();
+await setMode("Advanced");
+await tab("text");
+check("Text tab has a One font / Each style toggle for Power BI", (await pressed("One font")) === "true" && (await pressed("Each style")) === "false");
+await page.getByRole("button", { name: "Each style", exact: true }).click();
+check("Each style lists 14 rows", (await page.locator(".style-row").count()) === 14);
+check("Reset is hidden until a style is changed", (await page.locator(".style-row .btn:not([hidden])").count()) === 0);
+const row = (id) => page.locator(`.style-row[data-style="${id}"]`);
+await row("smallLabel").locator("select").first().selectOption("Arial");
+await row("smallLabel").locator(".style-size").fill("8");
+await row("smallLabel").locator("select").nth(1).selectOption("bold");
+check("changing a style shows its Reset button", await row("smallLabel").locator(".btn").isVisible());
+const readJson = () => page.locator(".code-text").evaluateAll((els) => JSON.parse(els.map((e) => e.textContent).join("\n")));
+await page.locator(".code-toggle").click();
+const tc = (await readJson()).textClasses;
+check("the export gains only the changed extra class", Object.keys(tc).sort().join() === "callout,header,label,smallLabel,title", Object.keys(tc).join());
+check("smallLabel carries font, size and weight", tc.smallLabel.fontFace === "Arial" && tc.smallLabel.fontSize === 8 && tc.smallLabel.fontWeight === "bold", JSON.stringify(tc.smallLabel));
+check("the export still passes the Power BI schema", validatePbi(await readJson()), JSON.stringify(validatePbi.errors?.slice(0, 2)));
+await row("smallLabel").locator(".btn").click();
+check("Reset drops the class from the export", !("smallLabel" in (await readJson()).textClasses));
+await row("title").locator(".style-size").fill("20");
+const titlePx = parseFloat(await page.locator(".pv-title").first().evaluate((e) => getComputedStyle(e).fontSize));
+check("a core style's size reaches the preview (20 pt title = 30.67 px)", Math.abs(titlePx - (20 * 4) / 3 - 4) < 0.1, String(titlePx));
+await page.screenshot({ path: path.join(SHOTS, "each-style.png") });
+await page.getByRole("button", { name: "One font", exact: true }).click();
+check("One font notes that style settings still apply", (await panelText()).includes("has its own settings"));
+await page.getByRole("button", { name: "Clear them", exact: true }).click();
+check("Clear them removes every override", Object.keys((await readJson()).textClasses).length === 4);
+await page.locator(".code-toggle").click();
+await pickTool("Tableau");
+check("Tableau has no style toggle", (await page.getByRole("button", { name: "Each style", exact: true }).count()) === 0);
+await reset();
+
 check("no console errors", consoleErrors.length === 0, consoleErrors.join(" | "));
 
 await browser.close();
