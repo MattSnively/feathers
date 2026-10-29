@@ -1,4 +1,5 @@
 import type { Theme } from "../model/theme";
+import { resolveTextStyle, TEXT_STYLES } from "../model/textStyles";
 import { validateTheme } from "../model/validate";
 
 const SCHEMA_URL =
@@ -7,10 +8,28 @@ const SCHEMA_URL =
 // Inside visualStyles, Power BI wants colors wrapped as { solid: { color } }.
 const fill = (color: string) => ({ solid: { color } });
 
+// Colors stay on the text roles; the other ten classes are written only once overridden (see resolveTextStyle).
+function textClasses(theme: Theme) {
+  const color: Record<string, string> = {
+    title: theme.text.primary, header: theme.text.primary, label: theme.text.secondary, callout: theme.palette.categorical[0]!,
+  };
+  const out: Record<string, object> = {};
+  for (const { id } of TEXT_STYLES) {
+    const r = resolveTextStyle(theme, id);
+    if (!r) continue;
+    out[id] = {
+      fontFace: r.font,
+      fontSize: r.size,
+      ...(r.weight ? { fontWeight: r.weight } : {}),
+      color: color[id] ?? theme.text.secondary,
+    };
+  }
+  return out;
+}
+
 export function exportPowerBi(theme: Theme): string {
   validateTheme(theme);
-  const { palette, status, text, background, gridline, visualBorder, fonts, sizes } = theme;
-  const pbiFonts = fonts.powerBi;
+  const { palette, status, text, background, gridline, visualBorder } = theme;
 
   const axisGridlines = [
     {
@@ -40,12 +59,7 @@ export function exportPowerBi(theme: Theme): string {
     background: background.container,
     secondaryBackground: gridline.color,
     tableAccent: palette.categorical[0],
-    textClasses: {
-      title: { fontFace: pbiFonts.title, fontSize: sizes.title, color: text.primary },
-      label: { fontFace: pbiFonts.body, fontSize: sizes.body, color: text.secondary },
-      callout: { fontFace: pbiFonts.title, fontSize: sizes.callout, color: palette.categorical[0] },
-      header: { fontFace: pbiFonts.title, fontSize: sizes.title, color: text.primary },
-    },
+    textClasses: textClasses(theme),
     visualStyles: {
       page: {
         "*": {

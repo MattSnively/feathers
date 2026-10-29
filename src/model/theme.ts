@@ -1,3 +1,5 @@
+import type { TextClass, TextStyle } from "./textStyles";
+
 /** Six-digit hex color, e.g. "#0A3746". Tableau's theme schema rejects 3- and 8-digit forms for several fields. */
 export type Hex = string;
 
@@ -51,4 +53,6 @@ export interface Theme {
   fonts: { powerBi: FontSet; tableau: FontSet };
   /** Point sizes shared by both tools. */
   sizes: { body: number; title: number; callout: number };
+  /** Power BI per-style overrides (the "Each style" view). Absent means every style follows body/title. */
+  textStyles?: Partial<Record<TextClass, TextStyle>>;
 }

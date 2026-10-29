@@ -1,4 +1,6 @@
+import { POWER_BI_FONTS } from "./fonts";
 import type { Hex, Line, Theme } from "./theme";
+import { TEXT_SIZE, TEXT_STYLES } from "./textStyles";
 
 export class ThemeError extends Error {}
 
@@ -32,4 +34,17 @@ export function validateTheme(theme: Theme): void {
   assertHex(theme.visualBorder.color, "visualBorder.color");
   assertLine(theme.gridline, "gridline");
   assertLine(theme.zeroline, "zeroline");
+  const known = new Set<string>(TEXT_STYLES.map((s) => s.id));
+  for (const [id, style] of Object.entries(theme.textStyles ?? {})) {
+    if (!known.has(id)) throw new ThemeError(`textStyles.${id} is not a Power BI text style`);
+    if (style.font !== undefined && !(POWER_BI_FONTS as readonly string[]).includes(style.font)) {
+      throw new ThemeError(`textStyles.${id}.font: "${style.font}" is not a Power BI font`);
+    }
+    if (style.size !== undefined && (!Number.isInteger(style.size) || style.size < TEXT_SIZE.min || style.size > TEXT_SIZE.max)) {
+      throw new ThemeError(`textStyles.${id}.size: ${style.size} must be a whole number from ${TEXT_SIZE.min} to ${TEXT_SIZE.max}`);
+    }
+    if (style.weight !== undefined && style.weight !== "normal" && style.weight !== "bold") {
+      throw new ThemeError(`textStyles.${id}.weight: "${style.weight}" must be normal or bold`);
+    }
+  }
 }
