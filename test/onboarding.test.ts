@@ -140,6 +140,34 @@ describe("importPowerBiTheme", () => {
     expect(r.ok && r.theme.gridline.width).toBe(5);
   });
 
+  it("imports per-style text classes, keeping only what differs for the four core ones", () => {
+    const json = JSON.stringify({
+      dataColors: ["#112233"],
+      textClasses: {
+        label: { fontFace: "Segoe UI", fontSize: 10 },
+        header: { fontFace: "Arial", fontSize: 14, fontWeight: "bold" },
+        smallLightLabel: { fontFace: "Segoe UI Light", fontSize: 8 },
+        boldLabel: { fontFace: "Papyrus", fontSize: 9, fontWeight: "600" },
+      },
+    });
+    const r = importPowerBiTheme(json, blank);
+    if (!r.ok) throw new Error(r.error);
+    expect(r.theme.textStyles).toMatchObject({
+      header: { font: "Arial", weight: "bold" },
+      smallLightLabel: { font: "Segoe UI Light", size: 8 },
+      boldLabel: { size: 9 },
+    });
+    expect(r.theme.textStyles).not.toHaveProperty("label");
+    expect(r.theme.textStyles?.boldLabel).not.toHaveProperty("font");
+    expect(r.applied.join(" ")).toContain("text styles");
+    expect(r.notes.join(" ")).toContain("Papyrus");
+  });
+
+  it("leaves textStyles unset when the file has no per-style differences", () => {
+    const r = importPowerBiTheme('{"dataColors":["#112233"]}', { ...blank, textStyles: { smallLabel: { size: 8 } } });
+    expect(r.ok && r.theme.textStyles).toBeUndefined();
+  });
+
   it("notes that per-visual formatting isn't imported", () => {
     const r = importPowerBiTheme('{"dataColors":["#112233"],"visualStyles":{"barChart":{"*":{}}}}', okabeIto);
     expect(r.ok && r.notes.join(" ")).toContain("individual visual types");

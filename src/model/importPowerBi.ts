@@ -2,6 +2,7 @@ import { POWER_BI_FONTS } from "./fonts";
 import { normalizeHex } from "./hex";
 import { MAX_COLORS } from "./hexlist";
 import { deriveRamps } from "./ramps";
+import { resolveTextStyle, TEXT_SIZE, TEXT_STYLES, type TextStyle } from "./textStyles";
 import type { LineStyle, Theme } from "./theme";
 import { validateTheme } from "./validate";
 
@@ -159,6 +160,36 @@ export function importPowerBiTheme(text: string, base: Theme): ImportResult {
     }
   }
   if (typeFound) applied.push("fonts and sizes");
+
+  // Per-style overrides. Title, label and callout already fed the base settings above, so for the four core
+  // classes only what differs from those is kept; the other ten have no base, so whatever the file sets is kept.
+  const core = new Set(["title", "header", "callout", "label"]);
+  // The file replaces the base theme's overrides rather than adding to them.
+  delete t.textStyles;
+  const baseline = t;
+  const overrides: Record<string, TextStyle> = {};
+  const skippedFonts = new Set<string>();
+  for (const spec of TEXT_STYLES) {
+    const raw = cls(spec.id);
+    const inherited = core.has(spec.id) ? resolveTextStyle(baseline, spec.id) : null;
+    const style: TextStyle = {};
+    const family = firstFamily(raw.fontFace);
+    if (family && (POWER_BI_FONTS as readonly string[]).includes(family)) {
+      if (family !== inherited?.font) style.font = family;
+    } else if (family) skippedFonts.add(family);
+    const size = wholePt(raw.fontSize);
+    if (size !== null && size >= TEXT_SIZE.min && size <= TEXT_SIZE.max && size !== inherited?.size) style.size = size;
+    if (raw.fontWeight === "bold" || raw.fontWeight === "normal") style.weight = raw.fontWeight;
+    if (Object.keys(style).length > 0) overrides[spec.id] = style;
+  }
+  if (Object.keys(overrides).length > 0) {
+    t.textStyles = overrides;
+    const n = Object.keys(overrides).length;
+    applied.push(`${n} text ${n === 1 ? "style" : "styles"}`);
+  }
+  if (skippedFonts.size > 0) {
+    notes.push(`Some text styles use fonts that aren't Power BI defaults (${[...skippedFonts].join(", ")}), so Feathers left those fonts alone.`);
+  }
 
   const perVisual = Object.keys(styles).some((k) => k !== "*" && k !== "page");
   if (perVisual) notes.push("Formatting for individual visual types in the file isn't imported.");
