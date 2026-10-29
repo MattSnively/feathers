@@ -1,6 +1,7 @@
 import { analyzeTheme, MIN_GRAPHIC_CONTRAST, MIN_TEXT_CONTRAST, type Finding, type Simulation } from "../a11y/analyze";
 import { contrastRatio } from "../a11y/color";
 import { fontStack } from "../export/css";
+import { resolveTextStyle, TEXT_STYLES, type TextClass } from "../model/textStyles";
 import type { Theme } from "../model/theme";
 import { validateTheme } from "../model/validate";
 
@@ -30,10 +31,12 @@ export interface SwatchGroup {
 
 export interface FontRow {
   /** The Power BI textClasses entry this row is written to. */
-  textClass: "title" | "header" | "label" | "callout";
+  textClass: TextClass;
   use: string;
   font: string;
   size: number;
+  /** Set only when the theme overrides this style's weight. */
+  weight?: "normal" | "bold";
   stack: string;
 }
 
@@ -58,7 +61,7 @@ const capitalize = (s: string) => s[0]!.toUpperCase() + s.slice(1);
 
 export function buildSheet(theme: Theme): SheetData {
   validateTheme(theme);
-  const { palette, status, text, background, gridline, zeroline, visualBorder, fonts, sizes } = theme;
+  const { palette, status, text, background, gridline, zeroline, visualBorder } = theme;
   const chart: [string, string][] = [["chart background", background.container]];
   const textSurfaces: [string, string][] = [["chart background", background.container], ["page background", background.page]];
 
@@ -129,15 +132,12 @@ export function buildSheet(theme: Theme): SheetData {
     },
   ];
 
-  const pbi = fonts.powerBi;
-  const row = (textClass: FontRow["textClass"], use: string, font: string, size: number): FontRow => ({ textClass, use, font, size, stack: fontStack(font) });
-  // Mirrors the textClasses the Power BI exporter writes.
-  const fontRows = [
-    row("title", "Page and visual titles", pbi.title, sizes.title),
-    row("header", "Headers", pbi.title, sizes.title),
-    row("label", "Labels, axes and tables", pbi.body, sizes.body),
-    row("callout", "Card values (big KPI numbers)", pbi.title, sizes.callout),
-  ];
+  // Mirrors the textClasses the Power BI exporter writes: the four core ones, plus any the theme overrides.
+  const fontRows = TEXT_STYLES.flatMap((spec): FontRow[] => {
+    const r = resolveTextStyle(theme, spec.id);
+    if (!r) return [];
+    return [{ textClass: spec.id, use: spec.use, font: r.font, size: r.size, ...(r.weight ? { weight: r.weight } : {}), stack: fontStack(r.font) }];
+  });
   const usesWindowsFont = fontRows.some((r) => /^(Segoe|DIN)/.test(r.font));
 
   const report = analyzeTheme(theme);

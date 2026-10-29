@@ -30,6 +30,15 @@ describe("buildSheet", () => {
     }
   });
 
+  it("lists extra styles only when the theme overrides them, matching the Power BI export", () => {
+    const theme = { ...playfair, textStyles: { smallLabel: { font: "Arial", size: 8, weight: "bold" as const } } };
+    const data = buildSheet(theme);
+    expect(data.fonts.map((f) => f.textClass)).toEqual(["title", "header", "callout", "label", "smallLabel"]);
+    const { textClasses } = JSON.parse(exportPowerBi(theme));
+    const row = data.fonts.find((f) => f.textClass === "smallLabel")!;
+    expect([row.font, row.size, row.weight]).toEqual([textClasses.smallLabel.fontFace, textClasses.smallLabel.fontSize, textClasses.smallLabel.fontWeight]);
+  });
+
   it("measures text against the worse of the two surfaces and thresholds text at 4.5:1, graphics at 3:1", () => {
     const light = { ...playfair, text: { ...playfair.text, muted: "#EEEEEE" } };
     const muted = buildSheet(light).groups.find((g) => g.title === "Text")!.swatches[2]!;
