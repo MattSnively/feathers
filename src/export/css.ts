@@ -1,3 +1,4 @@
+import { resolveTextStyle, TEXT_STYLES } from "../model/textStyles";
 import type { Theme } from "../model/theme";
 import { validateTheme } from "../model/validate";
 
@@ -55,6 +56,13 @@ export function exportCss(theme: Theme): string {
     ["size-title", `${sizes.title}pt`],
     ["size-callout", `${sizes.callout}pt`],
   ];
+  // Only styles the theme overrides get tokens, so a theme that never used "Each style" produces the same file as before.
+  const kebab = (id: string) => id.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+  const styled = TEXT_STYLES.filter((spec) => theme.textStyles?.[spec.id]).map((spec) => ({ name: kebab(spec.id), r: resolveTextStyle(theme, spec.id)! }));
+  for (const { name, r } of styled) {
+    tokens.push([`font-${name}`, fontStack(r.font)], [`size-${name}`, `${r.size}pt`]);
+    if (r.weight) tokens.push([`weight-${name}`, r.weight]);
+  }
   const v = (name: string) => `var(--feathers-${name})`;
 
   const series = palette.categorical.map(
@@ -138,5 +146,13 @@ export function exportCss(theme: Theme): string {
     "",
     ...series,
     "",
+    ...styled.flatMap(({ name, r }) => [
+      `.feathers-text-${name} {`,
+      `  font-family: ${v(`font-${name}`)};`,
+      `  font-size: ${v(`size-${name}`)};`,
+      ...(r.weight ? [`  font-weight: ${v(`weight-${name}`)};`] : []),
+      "}",
+      "",
+    ]),
   ].join("\n");
 }

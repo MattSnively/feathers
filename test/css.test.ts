@@ -11,7 +11,7 @@ describe("exportCss", () => {
     const tokens = declarations(css);
     expect(tokens.length).toBeGreaterThan(20);
     for (const [, name, value] of tokens) {
-      if (!/^(font|size)-/.test(name!) && name !== "border") expect(value, name).toMatch(/^#[0-9A-Fa-f]{6}$/);
+      if (!/^(font|size|weight)-/.test(name!) && name !== "border") expect(value, name).toMatch(/^#[0-9A-Fa-f]{6}$/);
     }
     // Rules may only reference tokens; a raw hex outside :root would drift from the theme.
     const afterRoot = css.slice(css.indexOf("}") + 1);
@@ -30,6 +30,18 @@ describe("exportCss", () => {
     const css = exportCss(playfair);
     expect(css.match(/^:root \{/gm)).toHaveLength(1);
     expect(css).not.toMatch(/^(body|h1|h2|h3|a)\b/m);
+  });
+
+  it("adds tokens and a class only for overridden text styles", () => {
+    expect(exportCss(playfair)).not.toContain(".feathers-text-");
+    const css = exportCss({ ...playfair, textStyles: { smallLabel: { font: "Georgia", size: 8, weight: "bold" }, label: { size: 11 } } });
+    expect(css).toContain('--feathers-font-small-label: "Georgia", serif;');
+    expect(css).toContain("--feathers-size-small-label: 8pt;");
+    expect(css).toContain("--feathers-weight-small-label: bold;");
+    expect(css).toContain("--feathers-size-label: 11pt;");
+    expect(css).not.toContain("--feathers-weight-label");
+    expect(css).toContain(".feathers-text-small-label {");
+    expect(css).not.toContain("bold-label");
   });
 
   it("gives the Power BI font web-safe fallbacks that end in a generic family", () => {
